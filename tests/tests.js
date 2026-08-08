@@ -1,4 +1,5 @@
 import { parseTimestamp, sourceTimeForMicTime, validateOffset } from "../app/timestamp.js";
+import { isLikelyAudioFile } from "../app/file-types.js";
 
 const tests = [
   ["parse seconds", () => equal(parseTimestamp("30"), 30)],
@@ -12,6 +13,10 @@ const tests = [
   ["reject negative timestamps", () => throws(() => parseTimestamp("-2"))],
   ["reject offset equal to duration", () => throws(() => validateOffset(100, 100))],
   ["reject offset beyond duration", () => throws(() => validateOffset(101, 100))],
+  ["accept FLAC with a generic MIME type", () => equal(isLikelyAudioFile({ name: "journey.flac", type: "application/octet-stream" }), true)],
+  ["accept AAC with no MIME type", () => equal(isLikelyAudioFile({ name: "journey.AAC", type: "" }), true)],
+  ["accept browser-reported audio MIME types", () => equal(isLikelyAudioFile({ name: "unknown", type: "audio/x-flac" }), true)],
+  ["reject unrelated generic files", () => equal(isLikelyAudioFile({ name: "notes.pdf", type: "application/octet-stream" }), false)],
 ];
 
 function equal(actual, expected) { if (actual !== expected) throw new Error(`expected ${expected}, received ${actual}`); }

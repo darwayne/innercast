@@ -1,6 +1,7 @@
 import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js";
 import { RecordingRepository } from "./repository.js";
 import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
+import { isLikelyAudioFile } from "./file-types.js";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();
@@ -109,8 +110,8 @@ function resetSelectedFile() {
 
 function selectFile(file) {
   if (!file || state.sessionActive) return;
-  if (file.type && !file.type.startsWith("audio/")) {
-    showToast("Choose an audio file that this browser can play.", true);
+  if (!isLikelyAudioFile(file)) {
+    showToast("Choose an AAC, M4A, MP3, FLAC, WAV, AIFF, CAF, or another browser-supported audio file.", true);
     return;
   }
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);

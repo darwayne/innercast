@@ -26,7 +26,15 @@ export class MicrophoneRecorder {
   }
 
   async prepare(): Promise<void> {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone recording is not supported by this browser.");
+    if (!window.isSecureContext) {
+      throw new Error("Microphone access requires HTTPS. When using Tailscale, run “make tailscale” and open the https://…ts.net address it displays.");
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("This browser does not expose microphone access. Open Innercast directly in Safari and check the site's microphone permission.");
+    }
+    if (!window.MediaRecorder) {
+      throw new Error("MediaRecorder is not supported by this Safari version. Update iOS and try again.");
+    }
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });

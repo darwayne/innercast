@@ -4,6 +4,8 @@
 
 Innercast is a browser-only, device-local audio companion. It plays a local source file while recording the microphone, preserves a simple source-to-microphone timeline mapping, and saves completed recordings as Blobs in IndexedDB. It has no backend, analytics, cloud storage, or recording-time network requests.
 
+The source picker explicitly supports AAC, M4A, MP4 audio, MP3, FLAC, WAV, AIFF, and CAF. Because iOS Files sometimes reports local audio with an empty or generic MIME type, Innercast also recognizes these filename extensions and lets the browser's audio decoder make the final compatibility decision.
+
 ## Run on macOS
 
 The only runtime dependency is the `python3` included with macOS developer tools.
@@ -25,6 +27,32 @@ To restrict the server to the Mac itself:
 ```sh
 make start BIND=127.0.0.1
 ```
+
+## Private HTTPS through Tailscale
+
+Mobile Safari only exposes microphone APIs to secure HTTPS pages. A Tailscale IP reached over plain `http://` is private, but it is not a browser secure context.
+
+If Tailscale is installed on the Mac and the iPhone is connected to the same tailnet, run:
+
+```sh
+make tailscale
+```
+
+This starts the Python server on localhost and runs Tailscale Serve in front of it. On first use, Tailscale may display a consent URL so HTTPS certificates can be enabled for the tailnet. It then prints a private address similar to:
+
+```text
+https://your-mac.your-tailnet.ts.net
+```
+
+Open that exact HTTPS address in Safari on the iPhone. Tapping **Start session** will then trigger Safari's microphone permission prompt. Press `Control-C` on the Mac to stop both Tailscale Serve and the local Python server.
+
+Choose a different internal port if necessary:
+
+```sh
+make tailscale PORT=4321
+```
+
+This does not make Innercast public and does not upload audio. Tailscale Serve only proxies application traffic within the tailnet.
 
 There is no install or build step. The browser-ready JavaScript is committed in `app/`; the typed domain source is in `src/`.
 
@@ -62,7 +90,7 @@ Microphone access requires a **secure context**. `localhost` is accepted on the 
 
 For realistic testing:
 
-1. Publish these static files to any HTTPS static host, or serve them from a trusted local HTTPS endpoint.
+1. Run `make tailscale` for private tailnet HTTPS, publish the static files to an HTTPS host, or serve them from another trusted local HTTPS endpoint.
 2. Open that HTTPS URL in Safari on the iPhone.
 3. Connect headphones, select an audio file from Files, and tap **Start session**.
 4. Allow microphone access when prompted.
@@ -98,6 +126,7 @@ app/app.js                   UI and session orchestration
 app/controllers.js           Recorder and synchronization controllers
 app/repository.js            Versioned IndexedDB abstraction
 app/timestamp.js             Timestamp and alignment helpers
+app/file-types.js            Robust audio file recognition
 src/                         Typed domain source
 tests/                       Dependency-free browser tests
 Makefile                     Local static server commands
