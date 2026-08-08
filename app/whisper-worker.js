@@ -2,7 +2,7 @@
 // The runtime and selected model are fetched only for optional transcription;
 // inference itself happens inside this worker and audio is never uploaded.
 import { env, pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
-import { ChunkedModelCache } from "./model-cache.js?v=17";
+import { ChunkedModelCache } from "./model-cache.js?v=18";
 
 env.useBrowserCache = false;
 env.useCustomCache = true;

@@ -117,19 +117,19 @@ For realistic testing:
 3. Connect headphones, select an audio file from Files, and tap **Start session**.
 4. Allow microphone access when prompted.
 5. Exercise pause/resume, manual stop, automatic stop at source end, playback from the Sessions screen, export, and delete.
-6. Keep Safari visible and the phone unlocked throughout the session.
+6. Keep Safari visible throughout the session. Innercast requests a screen wake lock while recording to prevent automatic locking when supported, but it cannot prevent a manual lock or iOS suspension.
 
 The static host only delivers application assets. Selected audio and microphone data never leave the browser. To test transcription, stop and save a session, open **Sessions**, select a model, and tap **Transcribe**. The first run needs internet access for the model download.
 
 ## iPhone Safari limitations
 
-- Safari or iOS may suspend playback/recording if the page is backgrounded or the phone locks. Innercast warns on visibility changes but cannot bypass OS restrictions.
+- Innercast requests a Screen Wake Lock for active sessions and reacquires it after the page becomes visible. Safari or iOS may still suspend playback/recording if the app is backgrounded or the phone is manually locked; a browser app cannot bypass those OS restrictions.
 - MediaRecorder MIME support varies by Safari/iOS version, so Innercast probes MP4/AAC and WebM options at runtime and stores the selected MIME type.
 - Microphone capture disables echo cancellation while keeping noise suppression and automatic gain control enabled. This tests the WebKit-recommended workaround for playback ducking while retaining the other voice-processing features.
 - MediaRecorder is not sample-locked to the Web Audio clock. Start/pause/resume calls have small browser-controlled latency.
 - On-device transcription can be slow, memory intensive, and heat the phone. Keep Safari visible and the phone unlocked. iOS may terminate a memory-heavy tab, but the recording is already safely saved before transcription begins.
 - Transcription runs in sequential bounded sections (15 seconds for Moonshine v2 and up to 30 seconds for other models). Segment timestamps are approximate, and a word crossing a section boundary may be less accurate.
-- On supported iOS releases, Innercast explicitly selects Safari's `playback` audio session for previews and saved recordings, and `play-and-record` during capture. This avoids a WebKit routing state where a saved Blob appears to play silently until another media file is played.
+- On supported iOS releases, Innercast selects Safari's `play-and-record` session during capture. Before ordinary source or saved-recording playback it applies WebKit's `playback` → `auto` reset sequence to leave the capture route and restore normal media output.
 - IndexedDB quota is device- and browser-dependent. There is no guaranteed capacity, and private browsing is unsuitable for durable archives.
 - Incoming calls, route changes, device disconnection, or revoked microphone permission may interrupt a session.
 
