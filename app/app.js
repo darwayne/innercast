@@ -43,6 +43,24 @@ function showToast(message, error = false) {
   window.setTimeout(() => elements.toast.classList.remove("show"), 4200);
 }
 
+function setBrowserAudioSession(type) {
+  // Safari exposes the Audio Session API on current iOS releases. Explicitly
+  // selecting playback prevents IndexedDB Blob players from remaining silent
+  // until another native media element happens to initialize the output route.
+  try {
+    if (navigator.audioSession && navigator.audioSession.type !== type) {
+      navigator.audioSession.type = type;
+    }
+  } catch { /* Other browsers manage their audio route automatically. */ }
+}
+
+function preparePlaybackOutput() {
+  setBrowserAudioSession("playback");
+  // Resume during the user's touch gesture when possible. The HTMLAudioElement
+  // remains the actual output path; this only unlocks Safari's audio machinery.
+  ensureAudioContext().catch(() => {});
+}
+
 function bytesLabel(bytes) {
   if (!Number.isFinite(bytes)) return "—";
   if (bytes < 1024) return `${bytes} B`;
@@ -218,6 +236,7 @@ async function startSession() {
   }
   elements.startButton.disabled = true;
   elements.startButton.querySelector("span").textContent = "Preparing microphone…";
+  setBrowserAudioSession("playback");
   try {
     const playbackUnlock = unlockNativePlayback();
     await ensureAudioContext();
@@ -228,6 +247,7 @@ async function startSession() {
     const offset = configuredOffset();
     const configuredValue = mode === "immediate" ? 0 : parseTimestamp(mode === "sourceTimestamp" ? elements.timestampInput.value : elements.delayInput.value);
     state.microphone = new MicrophoneRecorder();
+    setBrowserAudioSession("play-and-record");
     await state.microphone.prepare();
     state.microphone.onUnexpectedStop = handleRecorderFailure;
     state.synchronization = new SynchronizationController(state.audioContext);
@@ -249,6 +269,7 @@ async function startSession() {
     state.animationFrame = requestAnimationFrame(renderActiveSession);
     elements.activeSession.scrollIntoView({ behavior: "smooth", block: "center" });
   } catch (error) {
+    setBrowserAudioSession("playback");
     state.microphone?.release();
     state.sessionActive = false;
     setConfigurationLocked(false);
@@ -322,6 +343,7 @@ async function stopSession(reason = "manual") {
     showToast(`The recording could not be finalized: ${error.message}`, true);
   } finally {
     state.microphone?.release();
+    setBrowserAudioSession("playback");
     state.sessionActive = false;
     state.stopping = false;
     state.microphone = null;
@@ -421,6 +443,7 @@ async function transcribeSavedSession(session, panel) {
     showToast(cancelled ? "Transcription cancelled. The recording is unchanged." : `Transcription failed: ${error.message}`, !cancelled);
   } finally {
     if (state.transcriptionJob?.sessionId === session.id) state.transcriptionJob = null;
+    setBrowserAudioSession("playback");
     select.disabled = false;
     button.classList.remove("cancel-transcription");
     button.textContent = savedTranscription || session.transcription ? "Transcribe again" : "Transcribe";
@@ -490,6 +513,10 @@ async function loadSessions() {
       article.querySelector("time").textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(session.createdAt));
       const download = article.querySelector("a");
       download.download = `${safeFilename(session.source.filename)}-innercast-${session.createdAt.slice(0, 10)}.${extensionForMimeType(session.recording.mimeType)}`;
+      const recordingAudio = article.querySelector("audio");
+      recordingAudio.addEventListener("pointerdown", preparePlaybackOutput, { passive: true });
+      recordingAudio.addEventListener("touchstart", preparePlaybackOutput, { passive: true });
+      recordingAudio.addEventListener("play", () => setBrowserAudioSession("playback"));
       renderSavedTranscript(article, session);
       const transcriptionPanel = createTranscriptionPanel(session);
       article.querySelector(".session-buttons").before(transcriptionPanel);
@@ -584,6 +611,7 @@ elements.audio.addEventListener("timeupdate", () => {
   }
 });
 elements.audio.addEventListener("play", () => {
+  setBrowserAudioSession(state.sessionActive ? "play-and-record" : "playback");
   if (!state.sessionActive) elements.previewToggle.textContent = "Ⅱ";
   else if (state.synchronization?.recordingStarted && state.microphone?.state === "paused") {
     state.microphone.resume(state.audioContext.currentTime);
@@ -630,6 +658,7 @@ window.addEventListener("pagehide", () => {
 if (!["#/recorder", "#/sessions"].includes(window.location.hash)) {
   window.history.replaceState(null, "", routeForView("recorder"));
 }
+setBrowserAudioSession("playback");
 const initialView = viewFromRoute();
 switchView(initialView, false);
 if (initialView !== "sessions") loadSessions();

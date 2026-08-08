@@ -112,6 +112,7 @@ The static host only delivers application assets. Selected audio and microphone 
 - MediaRecorder is not sample-locked to the Web Audio clock. Start/pause/resume calls have small browser-controlled latency.
 - On-device Whisper can be slow, memory intensive, and heat the phone. Keep Safari visible and the phone unlocked. iOS may terminate a memory-heavy tab, but the recording is already safely saved before transcription begins.
 - Whisper is run in sequential 30-second sections. Segment timestamps are approximate, and a word crossing a section boundary may be less accurate.
+- On supported iOS releases, Innercast explicitly selects Safari's `playback` audio session for previews and saved recordings, and `play-and-record` during capture. This avoids a WebKit routing state where a saved Blob appears to play silently until another media file is played.
 - IndexedDB quota is device- and browser-dependent. There is no guaranteed capacity, and private browsing is unsuitable for durable archives.
 - Incoming calls, route changes, device disconnection, or revoked microphone permission may interrupt a session.
 
