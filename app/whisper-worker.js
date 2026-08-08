@@ -2,7 +2,7 @@
 // The runtime and selected model are fetched only for optional transcription;
 // inference itself happens inside this worker and audio is never uploaded.
 import { env, pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
-import { ChunkedModelCache } from "./model-cache.js?v=11";
+import { ChunkedModelCache } from "./model-cache.js?v=13";
 
 env.useBrowserCache = false;
 env.useCustomCache = true;
@@ -28,7 +28,7 @@ async function loadModel(modelId, device, dtype) {
   const configuration = JSON.stringify({ modelId, device, dtype });
   if (transcriber && loadedModelConfiguration === configuration) return transcriber;
   if (device === "webgpu" && !self.navigator?.gpu) {
-    throw new Error("This Safari version does not expose WebGPU. Distil-Large requires a WebGPU-capable browser.");
+    throw new Error("This browser does not expose the WebGPU support required by the selected model.");
   }
   if (transcriber?.dispose) await transcriber.dispose();
   transcriber = null;

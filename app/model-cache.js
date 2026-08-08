@@ -1,8 +1,12 @@
 const DATABASE_NAME = "innercast-whisper-model-cache";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const FILES_STORE = "files";
 const CHUNKS_STORE = "chunks";
 const CHUNK_SIZE = 32 * 1024 * 1024;
+const REMOVED_MODEL_URL_PARTS = [
+  "/distil-whisper/distil-large-v3.5-ONNX/",
+  "/onnx-community/whisper-medium.en_timestamped/",
+];
 
 function requestPromise(request) {
   return new Promise((resolve, reject) => {
@@ -61,6 +65,22 @@ export class ChunkedModelCache {
         if (!database.objectStoreNames.contains(CHUNKS_STORE)) {
           database.createObjectStore(CHUNKS_STORE, { keyPath: ["url", "index"] });
         }
+        // These models were removed after proving unusable on the target
+        // iPhone. Their weights are reproducible downloads, so reclaim only
+        // those cache records while preserving every working model.
+        const transaction = request.transaction;
+        const files = transaction.objectStore(FILES_STORE);
+        const chunks = transaction.objectStore(CHUNKS_STORE);
+        files.openCursor().onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (!cursor) return;
+          const url = cursor.value?.url || "";
+          if (REMOVED_MODEL_URL_PARTS.some((part) => url.includes(part))) {
+            cursor.delete();
+            chunks.delete(IDBKeyRange.bound([url, 0], [url, Number.MAX_SAFE_INTEGER]));
+          }
+          cursor.continue();
+        };
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error("Could not open the model cache."));

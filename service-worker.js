@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "innercast-";
-const APP_CACHE = `${CACHE_PREFIX}app-v11`;
+const APP_CACHE = `${CACHE_PREFIX}app-v13`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-v1`;
 
 const APP_SHELL = [
@@ -8,15 +8,15 @@ const APP_SHELL = [
   "./styles.css",
   "./manifest.webmanifest",
   "./assets/innercast-icon.svg",
-  "./app/app.js?v=11",
+  "./app/app.js?v=13",
   "./app/controllers.js",
   "./app/file-types.js",
   "./app/repository.js",
   "./app/timestamp.js",
-  "./app/whisper-transcriber.js?v=11",
-  "./app/whisper-worker.js?v=11",
-  "./app/moonshine-v2-worker.js?v=11",
-  "./app/model-cache.js?v=11",
+  "./app/whisper-transcriber.js?v=13",
+  "./app/whisper-worker.js?v=13",
+  "./app/moonshine-v2-worker.js?v=13",
+  "./app/model-cache.js?v=13",
 ];
 
 const CACHEABLE_RUNTIME_HOSTS = new Set([

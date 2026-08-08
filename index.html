@@ -22,6 +22,7 @@
       <nav aria-label="Primary navigation">
         <button class="nav-link active" data-view="recorder">Record</button>
         <button class="nav-link" data-view="sessions">Sessions <span id="session-count" class="count">0</span></button>
+        <button class="nav-link" data-view="settings">Settings</button>
       </nav>
     </header>
 
@@ -128,9 +129,27 @@
           <button class="primary-button compact" data-view="recorder">Record your first session</button>
         </div>
       </section>
+
+      <section id="settings-view" class="view" aria-labelledby="settings-title">
+        <div class="sessions-header">
+          <div><p class="eyebrow">On-device preferences</p><h1 id="settings-title">Settings</h1></div>
+        </div>
+        <section class="card settings-card" aria-labelledby="transcription-settings-title">
+          <div class="step-heading">
+            <span class="step-number">AI</span>
+            <div><h2 id="transcription-settings-title">Transcription model</h2><p>Choose the model used when you tap Transcribe on a saved session.</p></div>
+          </div>
+          <label class="settings-field" for="transcription-model-setting">
+            <span>Default model</span>
+            <select id="transcription-model-setting"></select>
+          </label>
+          <p id="transcription-model-description" class="settings-description"></p>
+          <p class="privacy-note settings-privacy"><span aria-hidden="true">◉</span> Models run locally. Recordings are never sent to a transcription service.</p>
+        </section>
+      </section>
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app/app.js?v=11"></script>
+    <script type="module" src="app/app.js?v=13"></script>
   </body>
 </html>

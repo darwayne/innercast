@@ -2,10 +2,13 @@ import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js"
 import { RecordingRepository } from "./repository.js";
 import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
 import { isLikelyAudioFile } from "./file-types.js";
-import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=11";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=13";
+import { ChunkedModelCache } from "./model-cache.js?v=13";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();
+const TRANSCRIPTION_MODEL_SETTING = "innercast-transcription-model";
+const DEFAULT_TRANSCRIPTION_MODEL = "small";
 const state = {
   file: null,
   objectUrl: null,
@@ -34,7 +37,44 @@ const elements = {
   waitingMessage: $("#waiting-message"), pauseButton: $("#pause-session"), stopButton: $("#stop-session"),
   debugValues: $("#debug-values"), sessionsList: $("#sessions-list"), emptySessions: $("#empty-sessions"),
   sessionCount: $("#session-count"), storageEstimate: $("#storage-estimate"), toast: $("#toast"),
+  transcriptionModelSetting: $("#transcription-model-setting"),
+  transcriptionModelDescription: $("#transcription-model-description"),
 };
+
+function selectedTranscriptionModel() {
+  try {
+    const saved = window.localStorage.getItem(TRANSCRIPTION_MODEL_SETTING);
+    return WHISPER_MODELS[saved] ? saved : DEFAULT_TRANSCRIPTION_MODEL;
+  } catch { return DEFAULT_TRANSCRIPTION_MODEL; }
+}
+
+function transcriptionModelLabel(modelKey = selectedTranscriptionModel()) {
+  return WHISPER_MODELS[modelKey]?.label.split(" —")[0] || "Whisper Small English";
+}
+
+function updateTranscriptionSettingDescription() {
+  const model = WHISPER_MODELS[selectedTranscriptionModel()];
+  if (!elements.transcriptionModelDescription || !model) return;
+  elements.transcriptionModelDescription.textContent = `${model.label} · ${model.approximateSize}. The first use downloads and caches this model on this device.`;
+}
+
+function initializeTranscriptionSettings() {
+  if (!elements.transcriptionModelSetting) return;
+  for (const [key, model] of Object.entries(WHISPER_MODELS)) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = `${model.label} (${model.approximateSize})`;
+    elements.transcriptionModelSetting.append(option);
+  }
+  elements.transcriptionModelSetting.value = selectedTranscriptionModel();
+  updateTranscriptionSettingDescription();
+  elements.transcriptionModelSetting.addEventListener("change", () => {
+    try { window.localStorage.setItem(TRANSCRIPTION_MODEL_SETTING, elements.transcriptionModelSetting.value); }
+    catch { showToast("Safari could not save this setting.", true); }
+    updateTranscriptionSettingDescription();
+    showToast(`${transcriptionModelLabel()} will be used for transcription.`);
+  });
+}
 
 function showToast(message, error = false) {
   elements.toast.textContent = message;
@@ -72,6 +112,15 @@ async function registerOfflineSupport() {
     // Recording and storage remain usable even if Safari declines service
     // worker registration (for example, in private browsing mode).
     console.warn("Offline support could not be installed.", error);
+  }
+}
+
+async function initializeModelCache() {
+  try {
+    const database = await new ChunkedModelCache().open();
+    database.close();
+  } catch (error) {
+    console.warn("The transcription model cache could not be initialized.", error);
   }
 }
 
@@ -419,7 +468,6 @@ function renderSavedTranscript(article, session) {
 }
 
 async function transcribeSavedSession(session, panel) {
-  const select = panel.querySelector("select");
   const button = panel.querySelector("button");
   const progress = panel.querySelector("progress");
   const status = panel.querySelector("small");
@@ -435,7 +483,6 @@ async function transcribeSavedSession(session, panel) {
 
   const transcriber = new OnDeviceWhisperTranscriber();
   state.transcriptionJob = { sessionId: session.id, transcriber };
-  select.disabled = true;
   button.textContent = "Cancel";
   button.classList.add("cancel-transcription");
   status.textContent = "Preparing saved recording… Keep this page open.";
@@ -452,7 +499,7 @@ async function transcribeSavedSession(session, panel) {
     }
     const transcription = await transcriber.transcribe(
       storedSession.recording.blob,
-      select.value,
+      selectedTranscriptionModel(),
       session.synchronization.recordingSourceOffsetSeconds,
       (update) => {
         status.textContent = update.message || "Transcribing on this device…";
@@ -470,11 +517,10 @@ async function transcribeSavedSession(session, panel) {
   } finally {
     if (state.transcriptionJob?.sessionId === session.id) state.transcriptionJob = null;
     setBrowserAudioSession("playback");
-    select.disabled = false;
     button.classList.remove("cancel-transcription");
     button.textContent = savedTranscription || session.transcription ? "Transcribe again" : "Transcribe";
     progress.classList.add("hidden");
-    status.textContent = "First use downloads the selected model. Audio remains on this device.";
+    status.textContent = `Uses ${transcriptionModelLabel()}. Change it in Settings.`;
     if (savedTranscription) {
       if (panel.isConnected) renderSavedTranscript(panel.closest(".session-card"), session);
       else if (viewFromRoute() === "sessions") await loadSessions();
@@ -488,17 +534,9 @@ function createTranscriptionPanel(session) {
   panel.className = "transcription-panel";
   panel.innerHTML = `
     <div><strong>On-device transcription</strong><span>Runs after recording so it cannot interrupt microphone capture.</span></div>
-    <div class="transcription-controls"><select aria-label="Transcription model"></select><button type="button"></button></div>
+    <div class="transcription-controls single"><button type="button"></button></div>
     <progress class="hidden" max="1" value="0"></progress>
-    <small>First use downloads the selected model. Audio remains on this device.</small>`;
-  const select = panel.querySelector("select");
-  for (const [key, model] of Object.entries(WHISPER_MODELS)) {
-    const option = document.createElement("option");
-    option.value = key;
-    option.textContent = `${model.label} (${model.approximateSize})`;
-    if (session.transcription?.model === key) option.selected = true;
-    select.append(option);
-  }
+    <small>Uses ${transcriptionModelLabel()}. Change it in Settings.</small>`;
   const button = panel.querySelector("button");
   button.textContent = session.transcription ? "Transcribe again" : "Transcribe";
   button.addEventListener("click", () => transcribeSavedSession(session, panel));
@@ -577,10 +615,14 @@ async function updateStorageEstimate() {
 
 function routeForView(view) { return `#/${view}`; }
 
-function viewFromRoute() { return window.location.hash === "#/sessions" ? "sessions" : "recorder"; }
+function viewFromRoute() {
+  if (window.location.hash === "#/sessions") return "sessions";
+  if (window.location.hash === "#/settings") return "settings";
+  return "recorder";
+}
 
 function switchView(view, updateRoute = true) {
-  view = view === "sessions" ? "sessions" : "recorder";
+  view = ["sessions", "settings"].includes(view) ? view : "recorder";
   if (state.sessionActive && view !== "recorder") {
     window.history.replaceState(null, "", routeForView("recorder"));
     showToast("Stop the active session before leaving the recorder.", true);
@@ -592,7 +634,9 @@ function switchView(view, updateRoute = true) {
   }
   document.querySelectorAll(".view").forEach((element) => element.classList.toggle("active", element.id === `${view}-view`));
   document.querySelectorAll(".nav-link").forEach((element) => element.classList.toggle("active", element.dataset.view === view));
-  document.title = view === "sessions" ? "Sessions — Innercast" : "Innercast — Play the journey. Record the experience.";
+  document.title = view === "sessions" ? "Sessions — Innercast"
+    : view === "settings" ? "Settings — Innercast"
+    : "Innercast — Play the journey. Record the experience.";
   if (view === "sessions") loadSessions();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -681,10 +725,12 @@ window.addEventListener("pagehide", () => {
   state.transcriptionJob?.transcriber.cancel();
   clearSessionObjectUrls();
 });
-if (!["#/recorder", "#/sessions"].includes(window.location.hash)) {
+if (!["#/recorder", "#/sessions", "#/settings"].includes(window.location.hash)) {
   window.history.replaceState(null, "", routeForView("recorder"));
 }
 setBrowserAudioSession("playback");
+initializeTranscriptionSettings();
+initializeModelCache();
 const initialView = viewFromRoute();
 switchView(initialView, false);
 if (initialView !== "sessions") loadSessions();

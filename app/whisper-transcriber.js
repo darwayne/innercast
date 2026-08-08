@@ -19,16 +19,6 @@ export const WHISPER_MODELS = Object.freeze({
     label: "Distil-Medium English — experimental",
     approximateSize: "~405 MB download",
   },
-  large: {
-    id: "distil-whisper/distil-large-v3.5-ONNX",
-    label: "Distil-Large v3.5 English — bleeding edge",
-    approximateSize: "~540 MB download",
-    device: "webgpu",
-    dtype: {
-      encoder_model: "q4f16",
-      decoder_model_merged: "q4f16",
-    },
-  },
   moonshineTiny: {
     id: "onnx-community/moonshine-tiny-ONNX",
     label: "Moonshine Tiny English — lightweight",
@@ -128,7 +118,7 @@ export class OnDeviceWhisperTranscriber {
 
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const workerFile = model.family === "moonshine-v2" ? "./moonshine-v2-worker.js?v=11" : "./whisper-worker.js?v=11";
+      const workerFile = model.family === "moonshine-v2" ? "./moonshine-v2-worker.js?v=13" : "./whisper-worker.js?v=13";
       const worker = new Worker(new URL(workerFile, import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => {
