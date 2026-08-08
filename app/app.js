@@ -2,8 +2,8 @@ import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js"
 import { RecordingRepository } from "./repository.js";
 import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
 import { isLikelyAudioFile } from "./file-types.js";
-import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=13";
-import { ChunkedModelCache } from "./model-cache.js?v=13";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=14";
+import { ChunkedModelCache } from "./model-cache.js?v=14";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();
@@ -520,7 +520,7 @@ async function transcribeSavedSession(session, panel) {
     button.classList.remove("cancel-transcription");
     button.textContent = savedTranscription || session.transcription ? "Transcribe again" : "Transcribe";
     progress.classList.add("hidden");
-    status.textContent = `Uses ${transcriptionModelLabel()}. Change it in Settings.`;
+    status.innerHTML = `Uses ${transcriptionModelLabel()}. <a href="#/settings">Change in Settings</a>.`;
     if (savedTranscription) {
       if (panel.isConnected) renderSavedTranscript(panel.closest(".session-card"), session);
       else if (viewFromRoute() === "sessions") await loadSessions();
@@ -536,7 +536,7 @@ function createTranscriptionPanel(session) {
     <div><strong>On-device transcription</strong><span>Runs after recording so it cannot interrupt microphone capture.</span></div>
     <div class="transcription-controls single"><button type="button"></button></div>
     <progress class="hidden" max="1" value="0"></progress>
-    <small>Uses ${transcriptionModelLabel()}. Change it in Settings.</small>`;
+    <small>Uses ${transcriptionModelLabel()}. <a href="#/settings">Change in Settings</a>.</small>`;
   const button = panel.querySelector("button");
   button.textContent = session.transcription ? "Transcribe again" : "Transcribe";
   button.addEventListener("click", () => transcribeSavedSession(session, panel));

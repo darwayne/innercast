@@ -118,7 +118,7 @@ export class OnDeviceWhisperTranscriber {
 
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const workerFile = model.family === "moonshine-v2" ? "./moonshine-v2-worker.js?v=13" : "./whisper-worker.js?v=13";
+      const workerFile = model.family === "moonshine-v2" ? "./moonshine-v2-worker.js?v=14" : "./whisper-worker.js?v=14";
       const worker = new Worker(new URL(workerFile, import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => {

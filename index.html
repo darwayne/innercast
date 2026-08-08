@@ -22,7 +22,6 @@
       <nav aria-label="Primary navigation">
         <button class="nav-link active" data-view="recorder">Record</button>
         <button class="nav-link" data-view="sessions">Sessions <span id="session-count" class="count">0</span></button>
-        <button class="nav-link" data-view="settings">Settings</button>
       </nav>
     </header>
 
@@ -133,6 +132,7 @@
       <section id="settings-view" class="view" aria-labelledby="settings-title">
         <div class="sessions-header">
           <div><p class="eyebrow">On-device preferences</p><h1 id="settings-title">Settings</h1></div>
+          <button class="secondary-button" data-view="sessions">Back to sessions</button>
         </div>
         <section class="card settings-card" aria-labelledby="transcription-settings-title">
           <div class="step-heading">
@@ -150,6 +150,6 @@
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app/app.js?v=13"></script>
+    <script type="module" src="app/app.js?v=14"></script>
   </body>
 </html>

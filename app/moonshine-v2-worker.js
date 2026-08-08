@@ -1,7 +1,7 @@
 // Moonshine v2 is not implemented by Transformers.js yet. Run its published
 // ONNX graphs directly so Innercast can keep inference browser-only.
 import * as ort from "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.wasm.min.mjs";
-import { ChunkedModelCache } from "./model-cache.js?v=13";
+import { ChunkedModelCache } from "./model-cache.js?v=14";
 
 const ORT_ASSET_ROOT = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/";
 const MODEL_HOST = "https://huggingface.co";
