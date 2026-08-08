@@ -131,7 +131,7 @@ export class OnDeviceWhisperTranscriber {
     const audio = await decodeToWhisperAudio(blob, onProgress, () => this.cancelled);
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const workerFile = model.family === "moonshine-v2" ? "../app/moonshine-v2-worker.js?v=10" : "../app/whisper-worker.js?v=10";
+      const workerFile = model.family === "moonshine-v2" ? "../app/moonshine-v2-worker.js?v=11" : "../app/whisper-worker.js?v=11";
       const worker = new Worker(new URL(workerFile, import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => { worker.terminate(); this.worker = null; this.activeReject = null; };

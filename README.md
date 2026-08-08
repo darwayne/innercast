@@ -68,7 +68,7 @@ For reliable offline preparation:
 4. Optionally choose Safari's **Share → Add to Home Screen** for a standalone launcher.
 5. Test by disconnecting from the network and refreshing Innercast.
 
-The service worker deliberately does not duplicate transcription-model files. Innercast streams uncached model responses into a dedicated IndexedDB model cache in 4 MB Blob chunks. Interrupted downloads resume with an HTTP Range request when the model host supports it, while models cached by older Innercast versions remain usable from Transformers.js's browser cache. Safari can evict both Cache Storage and IndexedDB under storage pressure, and clearing website data removes the app's offline assets, models, and recordings. Export important recordings separately.
+The service worker deliberately does not duplicate transcription-model files. Innercast streams uncached model responses into a dedicated IndexedDB model cache in 32 MB Blob chunks. Interrupted downloads resume with an HTTP Range request when the model host supports it, while models cached by older Innercast versions remain usable from Transformers.js's browser cache. The v11 cache migration removes model assets stored with the previous 4 MB layout as each asset is requested, then downloads it once in the new layout; it does not touch recordings or sessions. Safari can evict both Cache Storage and IndexedDB under storage pressure, and clearing website data removes the app's offline assets, models, and recordings. Export important recordings separately.
 
 ## How synchronization works
 

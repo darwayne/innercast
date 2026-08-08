@@ -2,7 +2,7 @@ const DATABASE_NAME = "innercast-whisper-model-cache";
 const DATABASE_VERSION = 1;
 const FILES_STORE = "files";
 const CHUNKS_STORE = "chunks";
-const CHUNK_SIZE = 4 * 1024 * 1024;
+const CHUNK_SIZE = 32 * 1024 * 1024;
 
 function requestPromise(request) {
   return new Promise((resolve, reject) => {
@@ -138,6 +138,13 @@ export class ChunkedModelCache {
 
   async existingResponse(url) {
     const file = await this.getFile(url);
+    // Cache manifests written before v11 used 4 MB chunks and did not record
+    // their layout. Remove only that model asset so its next download uses the
+    // faster 32 MB layout; recording/session data is stored in another DB.
+    if (file && file.chunkSizeBytes !== CHUNK_SIZE) {
+      await this.clearFile(url);
+      return null;
+    }
     if (!file?.complete || !file.chunkCount) return null;
     if (await this.countChunks(url) !== file.chunkCount) {
       await this.clearFile(url);
@@ -227,6 +234,7 @@ export class ChunkedModelCache {
         receivedBytes,
         totalBytes,
         chunkCount: chunkIndex,
+        chunkSizeBytes: CHUNK_SIZE,
         contentType: response.headers.get("content-type") || file?.contentType || "application/octet-stream",
         etag: response.headers.get("etag") || file?.etag || null,
         complete: false,
@@ -265,6 +273,7 @@ export class ChunkedModelCache {
       receivedBytes,
       totalBytes: totalBytes || receivedBytes,
       chunkCount: chunkIndex,
+      chunkSizeBytes: CHUNK_SIZE,
       contentType: response.headers.get("content-type") || file?.contentType || "application/octet-stream",
       etag: response.headers.get("etag") || file?.etag || null,
       complete: true,
@@ -284,24 +293,36 @@ export class ChunkedModelCache {
     if (await this.existingResponse(url)) return;
     let index = 0;
     let receivedBytes = 0;
+    let parts = [];
+    let partsSize = 0;
     const reader = response.body?.getReader();
     if (!reader) return;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const blob = new Blob([value]);
+    const saveParts = async () => {
+      if (!partsSize) return;
+      const blob = new Blob(parts);
       receivedBytes += blob.size;
       index += 1;
       await this.saveChunk(url, index - 1, blob, {
         url, receivedBytes, totalBytes: Number(response.headers.get("content-length")) || null,
-        chunkCount: index, contentType: response.headers.get("content-type"), etag: response.headers.get("etag"),
+        chunkCount: index, chunkSizeBytes: CHUNK_SIZE,
+        contentType: response.headers.get("content-type"), etag: response.headers.get("etag"),
         complete: false, updatedAt: new Date().toISOString(),
       });
+      parts = [];
+      partsSize = 0;
+    };
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+      partsSize += value.byteLength;
+      if (partsSize >= CHUNK_SIZE) await saveParts();
     }
+    await saveParts();
     const database = await this.open();
     const transaction = database.transaction(FILES_STORE, "readwrite");
     transaction.objectStore(FILES_STORE).put({
-      url, receivedBytes, totalBytes: receivedBytes, chunkCount: index,
+      url, receivedBytes, totalBytes: receivedBytes, chunkCount: index, chunkSizeBytes: CHUNK_SIZE,
       contentType: response.headers.get("content-type"), etag: response.headers.get("etag"),
       complete: true, updatedAt: new Date().toISOString(),
     });
