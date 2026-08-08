@@ -2,7 +2,7 @@ import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js"
 import { RecordingRepository } from "./repository.js";
 import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
 import { isLikelyAudioFile } from "./file-types.js";
-import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=2";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=3";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();

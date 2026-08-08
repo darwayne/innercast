@@ -21,6 +21,7 @@ const tests = [
   ["offer the tiny English Whisper model", () => equal(WHISPER_MODELS.tiny.id, "onnx-community/whisper-tiny.en")],
   ["offer the base English Whisper model", () => equal(WHISPER_MODELS.base.id, "onnx-community/whisper-base.en")],
   ["offer the small English Whisper model", () => equal(WHISPER_MODELS.small.id, "onnx-community/whisper-small.en")],
+  ["offer the medium English Whisper model", () => equal(WHISPER_MODELS.medium.id, "Xenova/whisper-medium.en")],
 ];
 
 function equal(actual, expected) { if (actual !== expected) throw new Error(`expected ${expected}, received ${actual}`); }

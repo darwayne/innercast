@@ -33,7 +33,7 @@ export interface SavedSession {
     language: string;
     /** web-speech-api is retained only so sessions saved by older builds remain readable. */
     provider: "whisper-transformers-js" | "web-speech-api";
-    model?: "tiny" | "base" | "small";
+    model?: "tiny" | "base" | "small" | "medium";
     createdAt?: string;
     segments: Array<{
       text: string;

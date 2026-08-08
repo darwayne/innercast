@@ -14,6 +14,11 @@ export const WHISPER_MODELS = Object.freeze({
     label: "Small English — experimental",
     approximateSize: "~250 MB download",
   },
+  medium: {
+    id: "Xenova/whisper-medium.en",
+    label: "Medium English — stress test",
+    approximateSize: "~780 MB download",
+  },
 });
 
 const TARGET_SAMPLE_RATE = 16_000;

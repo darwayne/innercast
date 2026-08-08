@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "innercast-";
-const APP_CACHE = `${CACHE_PREFIX}app-v2`;
+const APP_CACHE = `${CACHE_PREFIX}app-v3`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-v1`;
 
 const APP_SHELL = [
@@ -8,12 +8,12 @@ const APP_SHELL = [
   "./styles.css",
   "./manifest.webmanifest",
   "./assets/innercast-icon.svg",
-  "./app/app.js?v=2",
+  "./app/app.js?v=3",
   "./app/controllers.js",
   "./app/file-types.js",
   "./app/repository.js",
   "./app/timestamp.js",
-  "./app/whisper-transcriber.js?v=2",
+  "./app/whisper-transcriber.js?v=3",
   "./app/whisper-worker.js",
 ];
 

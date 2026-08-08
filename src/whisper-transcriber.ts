@@ -1,4 +1,4 @@
-export type WhisperModelKey = "tiny" | "base" | "small";
+export type WhisperModelKey = "tiny" | "base" | "small" | "medium";
 
 export interface WhisperModelChoice {
   id: string;
@@ -31,6 +31,7 @@ export const WHISPER_MODELS: Readonly<Record<WhisperModelKey, WhisperModelChoice
   tiny: { id: "onnx-community/whisper-tiny.en", label: "Tiny English — fastest", approximateSize: "~45 MB download" },
   base: { id: "onnx-community/whisper-base.en", label: "Base English — balanced", approximateSize: "~80 MB download" },
   small: { id: "onnx-community/whisper-small.en", label: "Small English — experimental", approximateSize: "~250 MB download" },
+  medium: { id: "Xenova/whisper-medium.en", label: "Medium English — stress test", approximateSize: "~780 MB download" },
 });
 
 const TARGET_SAMPLE_RATE = 16_000;
