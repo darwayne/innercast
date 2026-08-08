@@ -56,6 +56,20 @@ This does not make Innercast public and does not upload audio. Tailscale Serve o
 
 There is no install or build step. The browser-ready JavaScript is committed in `app/`; the typed domain source is in `src/`.
 
+## Offline use and Home Screen installation
+
+Innercast installs a service worker on its first successful HTTPS visit. It caches the application shell, routes, and pinned Transformers.js/ONNX runtime so Record and Sessions can be opened later without reaching the Mac or Tailscale endpoint. The selected source file, recordings, metadata, and transcripts already live in IndexedDB.
+
+For reliable offline preparation:
+
+1. Open Innercast once while the Mac/Tailscale endpoint and internet are available.
+2. Wait for the **Innercast is ready for offline use** message.
+3. If transcription is needed offline, successfully run Tiny or Base once while online. Only models actually used are downloaded and cached.
+4. Optionally choose Safari's **Share → Add to Home Screen** for a standalone launcher.
+5. Test by disconnecting from the network and refreshing Innercast.
+
+The service worker deliberately does not duplicate Whisper files. Transformers.js maintains its own browser cache for those large models. Safari can evict both Cache Storage and IndexedDB under storage pressure, and clearing website data removes the app's offline assets and recordings. Export important recordings separately.
+
 ## How synchronization works
 
 Each saved session stores one authoritative value:
@@ -138,6 +152,9 @@ app/timestamp.js             Timestamp and alignment helpers
 app/file-types.js            Robust audio file recognition
 app/whisper-transcriber.js   Post-recording decode and worker lifecycle
 app/whisper-worker.js        On-device Whisper inference and chunk mapping
+service-worker.js            Offline application/runtime caching
+manifest.webmanifest         Home Screen installation metadata
+assets/innercast-icon.svg    Install and browser icon
 src/                         Typed domain source
 tests/                       Dependency-free browser tests
 Makefile                     Local static server commands

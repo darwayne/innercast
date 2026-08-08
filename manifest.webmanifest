@@ -1,0 +1,19 @@
+{
+  "name": "Innercast — Play the journey. Record the experience.",
+  "short_name": "Innercast",
+  "description": "Private synchronized audio playback, microphone recording, and on-device transcription.",
+  "id": "./",
+  "start_url": "./#/recorder",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f0e7",
+  "theme_color": "#214d42",
+  "icons": [
+    {
+      "src": "assets/innercast-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -61,6 +61,20 @@ function preparePlaybackOutput() {
   ensureAudioContext().catch(() => {});
 }
 
+async function registerOfflineSupport() {
+  if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+  try {
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    await navigator.serviceWorker.register("./service-worker.js", { scope: "./" });
+    await navigator.serviceWorker.ready;
+    if (!hadController) showToast("Innercast is ready for offline use.");
+  } catch (error) {
+    // Recording and storage remain usable even if Safari declines service
+    // worker registration (for example, in private browsing mode).
+    console.warn("Offline support could not be installed.", error);
+  }
+}
+
 function bytesLabel(bytes) {
   if (!Number.isFinite(bytes)) return "—";
   if (bytes < 1024) return `${bytes} B`;
@@ -663,3 +677,4 @@ const initialView = viewFromRoute();
 switchView(initialView, false);
 if (initialView !== "sessions") loadSessions();
 restoreLastSelectedSource();
+window.addEventListener("load", registerOfflineSupport, { once: true });
