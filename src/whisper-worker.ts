@@ -14,19 +14,27 @@ interface TranscriptionRequest {
   audio: Float32Array;
   modelKey: WhisperModelKey;
   modelId: string;
+  device: "wasm" | "webgpu";
+  dtype: string | Record<string, string>;
   recordingSourceOffsetSeconds: number;
 }
 
-let loadedModelId: string | null = null;
+let loadedModelConfiguration: string | null = null;
 let transcriber: Awaited<ReturnType<typeof pipeline>> | null = null;
 
 self.onmessage = async (event: MessageEvent<TranscriptionRequest>) => {
   const request = event.data;
   if (request.type !== "transcribe") return;
   try {
-    if (!transcriber || loadedModelId !== request.modelId) {
-      transcriber = await pipeline("automatic-speech-recognition", request.modelId, { device: "wasm", dtype: "q8" });
-      loadedModelId = request.modelId;
+    const configuration = JSON.stringify({ modelId: request.modelId, device: request.device, dtype: request.dtype });
+    if (!transcriber || loadedModelConfiguration !== configuration) {
+      if (request.device === "webgpu" && !(self.navigator as Navigator & { gpu?: unknown }).gpu) {
+        throw new Error("This browser does not expose WebGPU.");
+      }
+      transcriber = await pipeline("automatic-speech-recognition", request.modelId, {
+        device: request.device, dtype: request.dtype,
+      });
+      loadedModelConfiguration = configuration;
     }
     const textParts: string[] = [];
     const segments: WhisperTranscript["segments"] = [];
@@ -49,7 +57,8 @@ self.onmessage = async (event: MessageEvent<TranscriptionRequest>) => {
     }
     const transcription: WhisperTranscript = {
       text: textParts.join(" "), language: "en", provider: "whisper-transformers-js",
-      model: request.modelKey, createdAt: new Date().toISOString(), segments, errorMessage: null,
+      model: request.modelKey, modelId: request.modelId, device: request.device,
+      createdAt: new Date().toISOString(), segments, errorMessage: null,
     };
     self.postMessage({ type: "complete", transcription });
   } catch (error) {

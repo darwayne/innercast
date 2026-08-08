@@ -15,9 +15,9 @@ export const WHISPER_MODELS = Object.freeze({
     approximateSize: "~250 MB download",
   },
   medium: {
-    id: "Xenova/whisper-medium.en",
-    label: "Medium English — stress test",
-    approximateSize: "~780 MB download",
+    id: "distil-whisper/distil-medium.en",
+    label: "Distil-Medium English — experimental",
+    approximateSize: "~405 MB download",
   },
 });
 
@@ -72,12 +72,13 @@ export class OnDeviceWhisperTranscriber {
     if (!window.Worker) throw new Error("Web Workers are not supported by this Safari version.");
 
     this.cancelled = false;
+    const model = WHISPER_MODELS[modelKey];
     const audio = await decodeToWhisperAudio(blob, onProgress, () => this.cancelled);
     if (this.cancelled) throw new Error("Transcription cancelled.");
 
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const worker = new Worker(new URL("./whisper-worker.js", import.meta.url), { type: "module" });
+      const worker = new Worker(new URL("./whisper-worker.js?v=6", import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => {
         worker.terminate();
@@ -102,7 +103,9 @@ export class OnDeviceWhisperTranscriber {
         type: "transcribe",
         audio,
         modelKey,
-        modelId: WHISPER_MODELS[modelKey].id,
+        modelId: model.id,
+        device: model.device || "wasm",
+        dtype: model.dtype || "q8",
         recordingSourceOffsetSeconds,
       }, [audio.buffer]);
     });

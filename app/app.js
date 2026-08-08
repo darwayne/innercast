@@ -2,7 +2,7 @@ import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js"
 import { RecordingRepository } from "./repository.js";
 import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
 import { isLikelyAudioFile } from "./file-types.js";
-import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=3";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=6";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();
@@ -407,7 +407,10 @@ function renderSavedTranscript(article, session) {
   const details = document.createElement("details");
   details.className = "saved-transcript";
   const summary = document.createElement("summary");
-  const modelLabel = session.transcription.model ? ` · Whisper ${session.transcription.model}` : "";
+  const modelChoice = WHISPER_MODELS[session.transcription.model];
+  const modelLabel = modelChoice
+    ? ` · ${modelChoice.label.split(" —")[0]}`
+    : session.transcription.model ? ` · Whisper ${session.transcription.model}` : "";
   summary.textContent = `Transcript · ${session.transcription.language || "Unknown language"}${modelLabel}`;
   const transcript = document.createElement("p");
   transcript.textContent = session.transcription.text || session.transcription.errorMessage || "No speech was recognized.";
@@ -438,8 +441,17 @@ async function transcribeSavedSession(session, panel) {
   status.textContent = "Preparing saved recording… Keep this page open.";
   let savedTranscription = null;
   try {
+    // Fetch a new structured clone of the Blob for every attempt. WebKit can
+    // invalidate an older IndexedDB Blob handle after the same record is
+    // rewritten to save its previous transcript. Reusing the session-card
+    // object then makes decodeAudioData fail with "The object can not be found
+    // here" when the user switches models and transcribes again.
+    const storedSession = await repository.getSession(session.id);
+    if (!storedSession?.recording?.blob?.size) {
+      throw new Error("The saved recording could not be reopened from this device.");
+    }
     const transcription = await transcriber.transcribe(
-      session.recording.blob,
+      storedSession.recording.blob,
       select.value,
       session.synchronization.recordingSourceOffsetSeconds,
       (update) => {

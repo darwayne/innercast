@@ -4,6 +4,8 @@ export interface WhisperModelChoice {
   id: string;
   label: string;
   approximateSize: string;
+  device?: "wasm" | "webgpu";
+  dtype?: string | Record<string, string>;
 }
 
 export interface TranscriptionProgress {
@@ -17,6 +19,8 @@ export interface WhisperTranscript {
   language: "en";
   provider: "whisper-transformers-js";
   model: WhisperModelKey;
+  modelId: string;
+  device: "wasm" | "webgpu";
   createdAt: string;
   segments: Array<{
     text: string;
@@ -31,7 +35,11 @@ export const WHISPER_MODELS: Readonly<Record<WhisperModelKey, WhisperModelChoice
   tiny: { id: "onnx-community/whisper-tiny.en", label: "Tiny English — fastest", approximateSize: "~45 MB download" },
   base: { id: "onnx-community/whisper-base.en", label: "Base English — balanced", approximateSize: "~80 MB download" },
   small: { id: "onnx-community/whisper-small.en", label: "Small English — experimental", approximateSize: "~250 MB download" },
-  medium: { id: "Xenova/whisper-medium.en", label: "Medium English — stress test", approximateSize: "~780 MB download" },
+  medium: {
+    id: "distil-whisper/distil-medium.en",
+    label: "Distil-Medium English — experimental",
+    approximateSize: "~405 MB download",
+  },
 });
 
 const TARGET_SAMPLE_RATE = 16_000;
@@ -80,7 +88,7 @@ export class OnDeviceWhisperTranscriber {
     const audio = await decodeToWhisperAudio(blob, onProgress, () => this.cancelled);
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const worker = new Worker(new URL("../app/whisper-worker.js", import.meta.url), { type: "module" });
+      const worker = new Worker(new URL("../app/whisper-worker.js?v=5", import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => { worker.terminate(); this.worker = null; this.activeReject = null; };
       worker.onmessage = (event: MessageEvent) => {
@@ -89,8 +97,10 @@ export class OnDeviceWhisperTranscriber {
         event.data.type === "complete" ? resolve(event.data.transcription) : reject(new Error(event.data.error));
       };
       worker.onerror = () => { finish(); reject(new Error("Whisper could not load.")); };
+      const model = WHISPER_MODELS[modelKey];
       worker.postMessage({
-        type: "transcribe", audio, modelKey, modelId: WHISPER_MODELS[modelKey].id, recordingSourceOffsetSeconds,
+        type: "transcribe", audio, modelKey, modelId: model.id,
+        device: model.device ?? "wasm", dtype: model.dtype ?? "q8", recordingSourceOffsetSeconds,
       }, [audio.buffer]);
     });
   }

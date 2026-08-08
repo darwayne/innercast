@@ -8,36 +8,40 @@ env.allowLocalModels = false;
 
 const SAMPLE_RATE = 16_000;
 const CHUNK_SECONDS = 30;
-let loadedModelId = null;
+let loadedModelConfiguration = null;
 let transcriber = null;
 
 function report(detail) { self.postMessage({ type: "progress", detail }); }
 
-async function loadModel(modelId) {
-  if (transcriber && loadedModelId === modelId) return transcriber;
+async function loadModel(modelId, device, dtype) {
+  const configuration = JSON.stringify({ modelId, device, dtype });
+  if (transcriber && loadedModelConfiguration === configuration) return transcriber;
+  if (device === "webgpu" && !self.navigator?.gpu) {
+    throw new Error("This Safari version does not expose WebGPU. Medium requires Safari 26 or another WebGPU-capable browser.");
+  }
   if (transcriber?.dispose) await transcriber.dispose();
   transcriber = null;
-  loadedModelId = null;
+  loadedModelConfiguration = null;
   report({ phase: "model", message: "Loading Whisper model…", progress: 0 });
   transcriber = await pipeline("automatic-speech-recognition", modelId, {
-    device: "wasm",
-    dtype: "q8",
+    device,
+    dtype,
     progress_callback: (event) => {
       const progress = Number.isFinite(event.progress) ? event.progress / 100 : null;
       const label = event.file ? `Downloading ${event.file}` : "Loading Whisper model…";
       report({ phase: "model", message: label, progress });
     },
   });
-  loadedModelId = modelId;
+  loadedModelConfiguration = configuration;
   report({ phase: "model", message: "Whisper model ready", progress: 1 });
   return transcriber;
 }
 
 self.onmessage = async (event) => {
   if (event.data?.type !== "transcribe") return;
-  const { audio, modelKey, modelId, recordingSourceOffsetSeconds } = event.data;
+  const { audio, modelKey, modelId, device, dtype, recordingSourceOffsetSeconds } = event.data;
   try {
-    const recognize = await loadModel(modelId);
+    const recognize = await loadModel(modelId, device, dtype);
     const chunkFrames = SAMPLE_RATE * CHUNK_SECONDS;
     const totalChunks = Math.max(1, Math.ceil(audio.length / chunkFrames));
     const textParts = [];
@@ -82,6 +86,8 @@ self.onmessage = async (event) => {
         language: "en",
         provider: "whisper-transformers-js",
         model: modelKey,
+        modelId,
+        device,
         createdAt: new Date().toISOString(),
         segments,
         errorMessage: null,
