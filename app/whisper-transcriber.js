@@ -2,12 +2,17 @@ export const WHISPER_MODELS = Object.freeze({
   tiny: {
     id: "onnx-community/whisper-tiny.en",
     label: "Tiny English — fastest",
-    approximateSize: "~75 MB",
+    approximateSize: "~45 MB download",
   },
   base: {
     id: "onnx-community/whisper-base.en",
     label: "Base English — balanced",
-    approximateSize: "~142 MB",
+    approximateSize: "~80 MB download",
+  },
+  small: {
+    id: "onnx-community/whisper-small.en",
+    label: "Small English — experimental",
+    approximateSize: "~250 MB download",
   },
 });
 

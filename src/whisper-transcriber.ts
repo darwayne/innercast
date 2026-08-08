@@ -1,4 +1,4 @@
-export type WhisperModelKey = "tiny" | "base";
+export type WhisperModelKey = "tiny" | "base" | "small";
 
 export interface WhisperModelChoice {
   id: string;
@@ -28,8 +28,9 @@ export interface WhisperTranscript {
 }
 
 export const WHISPER_MODELS: Readonly<Record<WhisperModelKey, WhisperModelChoice>> = Object.freeze({
-  tiny: { id: "onnx-community/whisper-tiny.en", label: "Tiny English — fastest", approximateSize: "~75 MB" },
-  base: { id: "onnx-community/whisper-base.en", label: "Base English — balanced", approximateSize: "~142 MB" },
+  tiny: { id: "onnx-community/whisper-tiny.en", label: "Tiny English — fastest", approximateSize: "~45 MB download" },
+  base: { id: "onnx-community/whisper-base.en", label: "Base English — balanced", approximateSize: "~80 MB download" },
+  small: { id: "onnx-community/whisper-small.en", label: "Small English — experimental", approximateSize: "~250 MB download" },
 });
 
 const TARGET_SAMPLE_RATE = 16_000;

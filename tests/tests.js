@@ -20,6 +20,7 @@ const tests = [
   ["reject unrelated generic files", () => equal(isLikelyAudioFile({ name: "notes.pdf", type: "application/octet-stream" }), false)],
   ["offer the tiny English Whisper model", () => equal(WHISPER_MODELS.tiny.id, "onnx-community/whisper-tiny.en")],
   ["offer the base English Whisper model", () => equal(WHISPER_MODELS.base.id, "onnx-community/whisper-base.en")],
+  ["offer the small English Whisper model", () => equal(WHISPER_MODELS.small.id, "onnx-community/whisper-small.en")],
 ];
 
 function equal(actual, expected) { if (actual !== expected) throw new Error(`expected ${expected}, received ${actual}`); }

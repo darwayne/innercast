@@ -64,7 +64,7 @@ For reliable offline preparation:
 
 1. Open Innercast once while the Mac/Tailscale endpoint and internet are available.
 2. Wait for the **Innercast is ready for offline use** message.
-3. If transcription is needed offline, successfully run Tiny or Base once while online. Only models actually used are downloaded and cached.
+3. If transcription is needed offline, successfully run each desired model once while online. Only models actually used are downloaded and cached.
 4. Optionally choose Safari's **Share → Add to Home Screen** for a standalone launcher.
 5. Test by disconnecting from the network and refreshing Innercast.
 
@@ -98,9 +98,9 @@ Completed microphone Blobs and metadata are stored directly in the versioned `sy
 
 The Record and Sessions screens use static-host-safe hash routes: `#/recorder` and `#/sessions`. Refreshing, bookmarking, and browser back/forward navigation preserve the selected screen without requiring server-side route rewriting.
 
-Each saved session offers optional on-device Whisper transcription. Choose **Tiny English** (fastest, roughly 75 MB) or **Base English** (better accuracy, roughly 142 MB), then leave the Sessions screen open while it runs. Innercast first saves the recording and only then decodes and transcribes it in a Web Worker, so transcription cannot compete with or interrupt active microphone capture. Thirty-second chunks are processed sequentially and the completed text plus approximate microphone/source timestamps are written back to the same IndexedDB session.
+Each saved session offers optional on-device Whisper transcription. Choose **Tiny English** (fastest, roughly 45 MB of quantized model data), **Base English** (balanced, roughly 80 MB), or experimental **Small English** (roughly 250 MB), then leave the Sessions screen open while it runs. Innercast first saves the recording and only then decodes and transcribes it in a Web Worker, so transcription cannot compete with or interrupt active microphone capture. Thirty-second chunks are processed sequentially and the completed text plus approximate microphone/source timestamps are written back to the same IndexedDB session.
 
-The first use of a model requires internet access to download the pinned Transformers.js runtime and quantized Whisper model from their public asset hosts. Browser caching normally avoids repeating the model download, but Safari may evict cached assets. Inference is local: only application/runtime/model files are downloaded, and the recording is never uploaded. Tiny and Base are English-only in this version.
+The first use of a model requires internet access to download the pinned Transformers.js runtime and quantized Whisper model from their public asset hosts. Browser caching normally avoids repeating the model download, but Safari may evict cached assets. Inference is local: only application/runtime/model files are downloaded, and the recording is never uploaded. All three choices are English-only. Small is experimental on iPhone because its larger model requires substantially more memory, takes longer, and is more likely to encounter Safari memory pressure or thermal throttling.
 
 Clearing Safari website data or using private browsing can remove recordings. Export anything important. The first version assembles each recording in memory before saving, which is appropriate for the expected recordings of roughly 50 MB or less; the recorder already isolates chunk collection so incremental persistence can be added later.
 
@@ -117,7 +117,7 @@ For realistic testing:
 5. Exercise pause/resume, manual stop, automatic stop at source end, playback from the Sessions screen, export, and delete.
 6. Keep Safari visible and the phone unlocked throughout the session.
 
-The static host only delivers application assets. Selected audio and microphone data never leave the browser. To test transcription, stop and save a session, open **Sessions**, select Tiny or Base, and tap **Transcribe**. The first run needs internet access for the model download.
+The static host only delivers application assets. Selected audio and microphone data never leave the browser. To test transcription, stop and save a session, open **Sessions**, select Tiny, Base, or Small, and tap **Transcribe**. The first run needs internet access for the model download.
 
 ## iPhone Safari limitations
 
