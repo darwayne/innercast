@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4efe6" />
+    <title>Innercast — Play the journey. Record the experience.</title>
+    <meta name="description" content="Private, synchronized audio playback and microphone recording in your browser." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#recorder" aria-label="Innercast home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Innercast</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <button class="nav-link active" data-view="recorder">Record</button>
+        <button class="nav-link" data-view="sessions">Sessions <span id="session-count" class="count">0</span></button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="recorder-view" class="view active" aria-labelledby="page-title">
+        <div class="hero">
+          <p class="eyebrow">A private listening companion</p>
+          <h1 id="page-title">Play the journey.<br /><em>Record the experience.</em></h1>
+          <p class="intro">Listen to any audio from your device while capturing a perfectly aligned voice recording.</p>
+        </div>
+
+        <div class="privacy-note"><span aria-hidden="true">◉</span> Your audio and recordings remain on this device and are never uploaded.</div>
+
+        <section class="card" aria-labelledby="source-heading">
+          <div class="step-heading">
+            <span class="step-number">01</span>
+            <div><h2 id="source-heading">Choose your audio</h2><p>Select a file already on this device.</p></div>
+          </div>
+          <input id="audio-file" type="file" accept="audio/*" hidden />
+          <label id="file-picker" class="file-picker" for="audio-file">
+            <span class="file-icon" aria-hidden="true">♫</span>
+            <span><strong>Choose an audio file</strong><small>MP3, M4A, WAV, or any format Safari can play</small></span>
+            <span class="pick-action">Browse</span>
+          </label>
+          <div id="source-details" class="source-details hidden">
+            <div class="track-row">
+              <span class="album-art">♫</span>
+              <span class="track-meta"><strong id="source-name"></strong><small id="source-meta"></small></span>
+              <button id="change-file" class="text-button">Change</button>
+            </div>
+            <audio id="source-audio" preload="metadata"></audio>
+            <div class="player-row">
+              <button id="preview-toggle" class="round-button" aria-label="Play preview">▶</button>
+              <div class="timeline">
+                <input id="seek" type="range" min="0" max="0" value="0" step="0.01" aria-label="Source position" />
+                <div class="time-row"><span id="current-time">00:00</span><span id="duration">00:00</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="start-heading">
+          <div class="step-heading">
+            <span class="step-number">02</span>
+            <div><h2 id="start-heading">Set the recording start</h2><p>Choose when your microphone joins the journey.</p></div>
+          </div>
+          <fieldset id="mode-options" class="mode-options" disabled>
+            <label class="mode-card selected">
+              <input type="radio" name="mode" value="immediate" checked />
+              <span class="radio-dot"></span>
+              <span><strong>Start together</strong><small>Recording begins the moment playback starts</small></span>
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="mode" value="sourceTimestamp" />
+              <span class="radio-dot"></span>
+              <span><strong>At a timestamp</strong><small>Begin when the source reaches a specific point</small></span>
+              <input id="timestamp-input" class="inline-input" type="text" inputmode="numeric" placeholder="00:05:30" aria-label="Source timestamp" disabled />
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="mode" value="delay" />
+              <span class="radio-dot"></span>
+              <span><strong>After a delay</strong><small>Begin a set number of seconds after playback</small></span>
+              <span class="input-suffix"><input id="delay-input" class="inline-input" type="number" inputmode="decimal" min="0" step="0.1" placeholder="30" aria-label="Delay in seconds" disabled /><small>sec</small></span>
+            </label>
+          </fieldset>
+          <p id="validation-message" class="validation-message" role="alert"></p>
+        </section>
+
+        <button id="start-session" class="primary-button" disabled><span>Start session</span><span aria-hidden="true">→</span></button>
+        <p class="device-reminder">Keep this page open and your phone unlocked while recording. Headphones recommended.</p>
+
+        <section id="active-session" class="active-session hidden" aria-live="polite">
+          <div class="recording-status"><span class="pulse"></span><span id="session-status">Recording</span></div>
+          <h2 id="active-source-name">Session in progress</h2>
+          <div class="active-times">
+            <div><small>Source</small><strong id="active-source-time">00:00 / 00:00</strong></div>
+            <div><small>Recording</small><strong id="active-recording-time">00:00</strong></div>
+            <div><small>Started at</small><strong id="active-offset">00:00</strong></div>
+          </div>
+          <div class="active-progress"><span id="active-progress-fill"></span></div>
+          <p id="waiting-message" class="waiting-message hidden">Playback is running. Recording will start at <strong></strong>.</p>
+          <div class="session-actions">
+            <button id="pause-session" class="secondary-button">Pause</button>
+            <button id="stop-session" class="stop-button">Stop & save</button>
+          </div>
+          <p class="lock-note">Seeking and configuration are locked during a synchronized session.</p>
+        </section>
+
+        <details id="debug-panel" class="debug-panel">
+          <summary>Developer diagnostics</summary>
+          <dl id="debug-values"></dl>
+        </details>
+      </section>
+
+      <section id="sessions-view" class="view" aria-labelledby="sessions-title">
+        <div class="sessions-header">
+          <div><p class="eyebrow">On-device archive</p><h1 id="sessions-title">Your sessions</h1></div>
+          <button class="secondary-button" data-view="recorder">New recording</button>
+        </div>
+        <div id="storage-estimate" class="storage-estimate">Storage information unavailable</div>
+        <div id="sessions-list" class="sessions-list"></div>
+        <div id="empty-sessions" class="empty-state">
+          <span>◌</span><h2>No recordings yet</h2><p>Your completed sessions will live here, only on this device.</p>
+          <button class="primary-button compact" data-view="recorder">Record your first session</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="app/app.js"></script>
+  </body>
+</html>
