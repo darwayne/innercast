@@ -122,6 +122,19 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .session-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 17px 0; }.session-facts span { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }.session-facts strong { display: block; margin-top: 4px; font-size: 13px; }
 .session-card audio { width: 100%; height: 40px; }
 .session-buttons { display: flex; gap: 8px; margin-top: 12px; }.session-buttons button, .session-buttons a { flex: 1; display: grid; place-items: center; min-height: 42px; border-radius: 10px; border: 1px solid var(--line); background: white; color: var(--ink); text-decoration: none; cursor: pointer; font-size: 13px; font-weight: 700; }.session-buttons .delete-button { color: #9e3827; }
+.saved-transcript { margin: 15px 0 0; padding: 14px; border-left: 3px solid var(--accent); border-radius: 0 9px 9px 0; background: #faf5ee; }
+.saved-transcript summary { cursor: pointer; font-size: 13px; font-weight: 750; }.saved-transcript p { margin: 11px 0 0; color: #485550; white-space: pre-wrap; line-height: 1.55; font-size: 13px; }
+.transcription-panel { margin-top: 15px; padding: 14px; border-radius: 12px; background: var(--pale-green); }
+.transcription-panel > div:first-child strong, .transcription-panel > div:first-child span { display: block; }
+.transcription-panel > div:first-child strong { font-size: 13px; }
+.transcription-panel > div:first-child span, .transcription-panel > small { margin-top: 4px; color: #587068; font-size: 11px; line-height: 1.4; }
+.transcription-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 11px; }
+.transcription-controls select, .transcription-controls button { min-height: 42px; border: 1px solid #b8ccc4; border-radius: 9px; background: white; padding: 0 10px; color: var(--ink); font-size: 12px; font-weight: 650; }
+.transcription-controls select { min-width: 0; width: 100%; }
+.transcription-controls button { cursor: pointer; color: var(--green); }
+.transcription-controls .cancel-transcription { color: #9e3827; }
+.transcription-panel progress { display: block; width: 100%; height: 7px; margin: 11px 0 5px; accent-color: var(--accent); }
+.transcription-panel > small { display: block; }
 .empty-state { padding: 70px 25px; text-align: center; }.empty-state > span { font-size: 48px; color: var(--accent); }.empty-state h2 { font: 500 27px Georgia, serif; margin: 15px 0 8px; }.empty-state p { color: var(--muted); margin: 0 0 24px; }
 .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translate(-50%, 30px); width: min(430px, calc(100% - 32px)); padding: 14px 18px; border-radius: 12px; background: #172a25; color: white; text-align: center; opacity: 0; pointer-events: none; transition: .25s ease; z-index: 20; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.2); }.toast.show { opacity: 1; transform: translate(-50%, 0); }.toast.error { background: #973b2b; }
 

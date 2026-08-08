@@ -28,4 +28,20 @@ export interface SavedSession {
   source: SourceMetadata;
   recording: RecordingMetadata;
   synchronization: SynchronizationMetadata;
+  transcription?: {
+    text: string;
+    language: string;
+    /** web-speech-api is retained only so sessions saved by older builds remain readable. */
+    provider: "whisper-transformers-js" | "web-speech-api";
+    model?: "tiny" | "base";
+    createdAt?: string;
+    segments: Array<{
+      text: string;
+      confidence?: number | null;
+      micTimestampSeconds: number;
+      sourceTimestampSeconds: number;
+      endMicTimestampSeconds?: number | null;
+    }>;
+    errorMessage: string | null;
+  };
 }

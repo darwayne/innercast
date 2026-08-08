@@ -1,5 +1,6 @@
 import { parseTimestamp, sourceTimeForMicTime, validateOffset } from "../app/timestamp.js";
 import { isLikelyAudioFile } from "../app/file-types.js";
+import { WHISPER_MODELS } from "../app/whisper-transcriber.js";
 
 const tests = [
   ["parse seconds", () => equal(parseTimestamp("30"), 30)],
@@ -17,6 +18,8 @@ const tests = [
   ["accept AAC with no MIME type", () => equal(isLikelyAudioFile({ name: "journey.AAC", type: "" }), true)],
   ["accept browser-reported audio MIME types", () => equal(isLikelyAudioFile({ name: "unknown", type: "audio/x-flac" }), true)],
   ["reject unrelated generic files", () => equal(isLikelyAudioFile({ name: "notes.pdf", type: "application/octet-stream" }), false)],
+  ["offer the tiny English Whisper model", () => equal(WHISPER_MODELS.tiny.id, "onnx-community/whisper-tiny.en")],
+  ["offer the base English Whisper model", () => equal(WHISPER_MODELS.base.id, "onnx-community/whisper-base.en")],
 ];
 
 function equal(actual, expected) { if (actual !== expected) throw new Error(`expected ${expected}, received ${actual}`); }

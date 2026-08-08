@@ -12,6 +12,9 @@ export class MicrophoneRecorder {
   private startClockTime: number | null = null;
   private pausedClockTime: number | null = null;
   private accumulatedPauseSeconds = 0;
+  private hasStarted = false;
+  private finalBlobPromise: Promise<Blob> | null = null;
+  private resolveFinalBlob: ((blob: Blob) => void) | null = null;
   mimeType = "";
   onUnexpectedStop: ((error: Error) => void) | null = null;
 
@@ -42,7 +45,10 @@ export class MicrophoneRecorder {
     this.recorder = new MediaRecorder(this.stream, type ? { mimeType: type } : undefined);
     this.mimeType = this.recorder.mimeType || type || "application/octet-stream";
     this.chunks = [];
+    this.hasStarted = false;
+    this.finalBlobPromise = new Promise((resolve) => { this.resolveFinalBlob = resolve; });
     this.recorder.ondataavailable = (event) => { if (event.data.size) this.chunks.push(event.data); };
+    this.recorder.onstop = () => this.resolveFinalBlob?.(new Blob(this.chunks, { type: this.mimeType }));
     this.recorder.onerror = (event) => this.onUnexpectedStop?.(event.error ?? new Error("The microphone recorder reported an error."));
     for (const track of this.stream.getAudioTracks()) {
       track.onended = () => this.onUnexpectedStop?.(new Error("The microphone became unavailable."));
@@ -54,6 +60,7 @@ export class MicrophoneRecorder {
     this.startClockTime = audioClockTime;
     this.pausedClockTime = null;
     this.accumulatedPauseSeconds = 0;
+    this.hasStarted = true;
     this.recorder.start(1000);
   }
 
@@ -79,16 +86,17 @@ export class MicrophoneRecorder {
   }
 
   async stop(audioClockTime: number): Promise<CompletedRecording | null> {
-    if (!this.recorder || this.recorder.state === "inactive") {
+    if (!this.recorder || !this.hasStarted) {
       this.release();
       return null;
     }
     const durationSeconds = this.elapsed(audioClockTime);
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      this.recorder!.onstop = () => resolve(new Blob(this.chunks, { type: this.mimeType }));
-      this.recorder!.onerror = (event) => reject(event.error ?? new Error("Recording could not be finalized."));
-      this.recorder!.stop();
-    });
+    if (this.recorder.state !== "inactive") this.recorder.stop();
+    const fallbackBlob = (): Blob => new Blob(this.chunks, { type: this.mimeType });
+    const blob = await Promise.race([
+      this.finalBlobPromise!,
+      new Promise<Blob>((resolve) => window.setTimeout(() => resolve(fallbackBlob()), 1500)),
+    ]);
     this.release();
     return { blob, mimeType: this.mimeType, durationSeconds };
   }

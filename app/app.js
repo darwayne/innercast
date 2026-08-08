@@ -2,6 +2,7 @@ import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js"
 import { RecordingRepository } from "./repository.js";
 import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
 import { isLikelyAudioFile } from "./file-types.js";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();
@@ -10,13 +11,15 @@ const state = {
   objectUrl: null,
   duration: 0,
   audioContext: null,
-  mediaSourceNode: null,
   microphone: null,
   synchronization: null,
   sessionActive: false,
   stopping: false,
   animationFrame: 0,
   sessionObjectUrls: [],
+  persistSourceOnMetadata: false,
+  sourceFromStorage: false,
+  transcriptionJob: null,
 };
 
 const elements = {
@@ -44,7 +47,9 @@ function bytesLabel(bytes) {
   if (!Number.isFinite(bytes)) return "—";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes < 1024 ** 4) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+  return `${(bytes / 1024 ** 4).toFixed(2)} TB`;
 }
 
 function currentMode() { return document.querySelector('input[name="mode"]:checked').value; }
@@ -99,6 +104,8 @@ function resetSelectedFile() {
   elements.audio.pause();
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   state.file = null; state.objectUrl = null; state.duration = 0;
+  state.persistSourceOnMetadata = false;
+  state.sourceFromStorage = false;
   elements.audio.removeAttribute("src");
   elements.audio.load();
   elements.fileInput.value = "";
@@ -108,7 +115,7 @@ function resetSelectedFile() {
   elements.startButton.disabled = true;
 }
 
-function selectFile(file) {
+function selectFile(file, persistOnLoad = true) {
   if (!file || state.sessionActive) return;
   if (!isLikelyAudioFile(file)) {
     showToast("Choose an AAC, M4A, MP3, FLAC, WAV, AIFF, CAF, or another browser-supported audio file.", true);
@@ -116,6 +123,8 @@ function selectFile(file) {
   }
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   state.file = file;
+  state.persistSourceOnMetadata = persistOnLoad;
+  state.sourceFromStorage = !persistOnLoad;
   state.objectUrl = URL.createObjectURL(file);
   elements.audio.src = state.objectUrl;
   elements.sourceName.textContent = file.name;
@@ -125,15 +134,45 @@ function selectFile(file) {
   elements.audio.load();
 }
 
+async function restoreLastSelectedSource() {
+  if (state.file) return;
+  try {
+    const saved = await repository.getLastSelectedSource();
+    if (!saved?.blob?.size || state.file) return;
+    const file = new File([saved.blob], saved.filename, {
+      type: saved.mimeType || saved.blob.type || "application/octet-stream",
+      lastModified: new Date(saved.selectedAt).getTime(),
+    });
+    selectFile(file, false);
+    elements.sourceMeta.textContent = `${file.type || "Unknown audio type"} · ${bytesLabel(file.size)} · Saved on this device`;
+  } catch (error) {
+    showToast(`The last source file could not be restored: ${error.message}`, true);
+  }
+}
+
 async function ensureAudioContext() {
   if (!state.audioContext) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) throw new Error("Web Audio is not supported in this browser.");
     state.audioContext = new AudioContextClass();
-    state.mediaSourceNode = state.audioContext.createMediaElementSource(elements.audio);
-    state.mediaSourceNode.connect(state.audioContext.destination);
   }
   if (state.audioContext.state === "suspended") await state.audioContext.resume();
+}
+
+async function unlockNativePlayback() {
+  // Invoke play synchronously from the Start button gesture, before awaiting
+  // microphone permission. iOS may otherwise consume the gesture while its
+  // permission sheet is open and refuse or silently suppress later playback.
+  const requestedPosition = elements.audio.currentTime;
+  const wasMuted = elements.audio.muted;
+  elements.audio.muted = true;
+  try {
+    await elements.audio.play();
+    elements.audio.pause();
+    elements.audio.currentTime = requestedPosition;
+  } finally {
+    elements.audio.muted = wasMuted;
+  }
 }
 
 async function beginMicrophoneRecording() {
@@ -160,6 +199,7 @@ function renderActiveSession() {
   elements.debugValues.innerHTML = [
     ["AudioContext.currentTime", state.audioContext.currentTime.toFixed(3)],
     ["Source currentTime", sourceTime.toFixed(3)],
+    ["Source playback", elements.audio.paused ? "paused" : "playing"],
     ["Configured offset", sync.configuredValueSeconds.toFixed(3)],
     ["Recording state", state.sessionActive ? (sync.recordingStarted ? "recording" : "waiting") : "idle"],
     ["MediaRecorder state", state.microphone.state],
@@ -172,10 +212,16 @@ function renderActiveSession() {
 
 async function startSession() {
   if (state.sessionActive || !validateConfiguration()) return;
+  if (state.transcriptionJob) {
+    showToast("Finish or cancel the on-device transcription before starting a recording.", true);
+    return;
+  }
   elements.startButton.disabled = true;
   elements.startButton.querySelector("span").textContent = "Preparing microphone…";
   try {
+    const playbackUnlock = unlockNativePlayback();
     await ensureAudioContext();
+    await playbackUnlock;
     elements.audio.pause();
     const sourceStartPosition = elements.audio.currentTime;
     const mode = currentMode();
@@ -197,6 +243,7 @@ async function startSession() {
     elements.waitingMessage.querySelector("strong").textContent = formatTimestamp(offset);
     elements.pauseButton.textContent = "Pause";
     await elements.audio.play();
+    if (elements.audio.paused) throw new Error("Safari did not start source playback. Tap Start session again and confirm that audio is routed to your headphones.");
     if (mode === "immediate") await beginMicrophoneRecording();
     cancelAnimationFrame(state.animationFrame);
     state.animationFrame = requestAnimationFrame(renderActiveSession);
@@ -259,13 +306,17 @@ async function stopSession(reason = "manual") {
       };
       try {
         await repository.saveSession(session);
-        showToast(reason === "ended" ? "Playback ended. Recording saved on this device." : "Recording saved on this device.");
+        showToast(reason === "ended"
+          ? "Playback ended. Recording saved on this device."
+          : reason === "error" ? "Recording was interrupted; available audio was saved." : "Recording saved on this device.");
       } catch (error) {
         const quota = error?.name === "QuotaExceededError" || /quota/i.test(error?.message || "");
         showToast(quota ? "This device does not have enough browser storage to save the recording. Export other sessions and delete them, then try again." : `The recording could not be saved: ${error.message}`, true);
       }
-    } else {
+    } else if (!hadRecording) {
       showToast("Session stopped before the recording start point, so nothing was saved.");
+    } else {
+      showToast("Recording started but Safari did not provide any audio data to save.", true);
     }
   } catch (error) {
     showToast(`The recording could not be finalized: ${error.message}`, true);
@@ -304,13 +355,122 @@ function clearSessionObjectUrls() {
   state.sessionObjectUrls = [];
 }
 
+function renderSavedTranscript(article, session) {
+  if (!article) return;
+  article.querySelector(".transcript-fact")?.remove();
+  article.querySelector(".saved-transcript")?.remove();
+  if (!session.transcription) return;
+
+  const wordCount = session.transcription.text?.trim()
+    ? session.transcription.text.trim().split(/\s+/).length : 0;
+  const fact = document.createElement("div");
+  fact.className = "transcript-fact";
+  fact.innerHTML = `<span>Transcript</span><strong>${wordCount ? `${wordCount} words` : "No speech"}</strong>`;
+  article.querySelector(".session-facts").append(fact);
+
+  const details = document.createElement("details");
+  details.className = "saved-transcript";
+  const summary = document.createElement("summary");
+  const modelLabel = session.transcription.model ? ` · Whisper ${session.transcription.model}` : "";
+  summary.textContent = `Transcript · ${session.transcription.language || "Unknown language"}${modelLabel}`;
+  const transcript = document.createElement("p");
+  transcript.textContent = session.transcription.text || session.transcription.errorMessage || "No speech was recognized.";
+  details.append(summary, transcript);
+  article.querySelector("audio").after(details);
+}
+
+async function transcribeSavedSession(session, panel) {
+  const select = panel.querySelector("select");
+  const button = panel.querySelector("button");
+  const progress = panel.querySelector("progress");
+  const status = panel.querySelector("small");
+
+  if (state.transcriptionJob) {
+    if (state.transcriptionJob.sessionId === session.id) {
+      state.transcriptionJob.transcriber.cancel();
+    } else {
+      showToast("Finish or cancel the current transcription first.", true);
+    }
+    return;
+  }
+
+  const transcriber = new OnDeviceWhisperTranscriber();
+  state.transcriptionJob = { sessionId: session.id, transcriber };
+  select.disabled = true;
+  button.textContent = "Cancel";
+  button.classList.add("cancel-transcription");
+  status.textContent = "Preparing saved recording… Keep this page open.";
+  let savedTranscription = null;
+  try {
+    const transcription = await transcriber.transcribe(
+      session.recording.blob,
+      select.value,
+      session.synchronization.recordingSourceOffsetSeconds,
+      (update) => {
+        status.textContent = update.message || "Transcribing on this device…";
+        progress.classList.toggle("hidden", !Number.isFinite(update.progress));
+        if (Number.isFinite(update.progress)) progress.value = Math.max(0, Math.min(1, update.progress));
+      },
+    );
+    await repository.updateSessionTranscription(session.id, transcription);
+    session.transcription = transcription;
+    savedTranscription = transcription;
+    showToast("On-device transcript saved with this recording.");
+  } catch (error) {
+    const cancelled = /cancelled/i.test(error?.message || "");
+    showToast(cancelled ? "Transcription cancelled. The recording is unchanged." : `Transcription failed: ${error.message}`, !cancelled);
+  } finally {
+    if (state.transcriptionJob?.sessionId === session.id) state.transcriptionJob = null;
+    select.disabled = false;
+    button.classList.remove("cancel-transcription");
+    button.textContent = savedTranscription || session.transcription ? "Transcribe again" : "Transcribe";
+    progress.classList.add("hidden");
+    status.textContent = "First use downloads the selected model. Audio remains on this device.";
+    if (savedTranscription) {
+      if (panel.isConnected) renderSavedTranscript(panel.closest(".session-card"), session);
+      else if (viewFromRoute() === "sessions") await loadSessions();
+    }
+    updateStorageEstimate();
+  }
+}
+
+function createTranscriptionPanel(session) {
+  const panel = document.createElement("section");
+  panel.className = "transcription-panel";
+  panel.innerHTML = `
+    <div><strong>On-device transcription</strong><span>Runs after recording so it cannot interrupt microphone capture.</span></div>
+    <div class="transcription-controls"><select aria-label="Whisper model"></select><button type="button"></button></div>
+    <progress class="hidden" max="1" value="0"></progress>
+    <small>First use downloads the selected model. Audio remains on this device.</small>`;
+  const select = panel.querySelector("select");
+  for (const [key, model] of Object.entries(WHISPER_MODELS)) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = `${model.label} (${model.approximateSize})`;
+    if (session.transcription?.model === key) option.selected = true;
+    select.append(option);
+  }
+  const button = panel.querySelector("button");
+  button.textContent = session.transcription ? "Transcribe again" : "Transcribe";
+  button.addEventListener("click", () => transcribeSavedSession(session, panel));
+  return panel;
+}
+
 async function loadSessions() {
   try {
     const sessions = await repository.listSessions();
+    // Detach media elements before revoking their Blob URLs. Revoking a URL
+    // while Mobile Safari still has it attached can poison the replacement
+    // player with a MEDIA_ERR_SRC_NOT_SUPPORTED state.
+    elements.sessionsList.querySelectorAll("audio").forEach((audio) => {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    });
+    elements.sessionsList.innerHTML = "";
     clearSessionObjectUrls();
     elements.sessionCount.textContent = String(sessions.length);
     elements.emptySessions.classList.toggle("hidden", sessions.length > 0);
-    elements.sessionsList.innerHTML = "";
     for (const session of sessions) {
       const url = URL.createObjectURL(session.recording.blob);
       state.sessionObjectUrls.push(url);
@@ -330,7 +490,14 @@ async function loadSessions() {
       article.querySelector("time").textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(session.createdAt));
       const download = article.querySelector("a");
       download.download = `${safeFilename(session.source.filename)}-innercast-${session.createdAt.slice(0, 10)}.${extensionForMimeType(session.recording.mimeType)}`;
+      renderSavedTranscript(article, session);
+      const transcriptionPanel = createTranscriptionPanel(session);
+      article.querySelector(".session-buttons").before(transcriptionPanel);
       article.querySelector(".delete-button").addEventListener("click", async () => {
+        if (state.transcriptionJob?.sessionId === session.id) {
+          showToast("Cancel this transcription before deleting its recording.", true);
+          return;
+        }
         if (!window.confirm(`Delete the recording for “${session.source.filename}”? This cannot be undone.`)) return;
         try { await repository.deleteSession(session.id); await loadSessions(); showToast("Recording deleted from this device."); }
         catch (error) { showToast(`Could not delete the recording: ${error.message}`, true); }
@@ -355,25 +522,61 @@ async function updateStorageEstimate() {
   } catch { elements.storageEstimate.textContent = "Storage estimate is currently unavailable."; }
 }
 
-function switchView(view) {
-  if (state.sessionActive && view !== "recorder") { showToast("Stop the active session before leaving the recorder.", true); return; }
+function routeForView(view) { return `#/${view}`; }
+
+function viewFromRoute() { return window.location.hash === "#/sessions" ? "sessions" : "recorder"; }
+
+function switchView(view, updateRoute = true) {
+  view = view === "sessions" ? "sessions" : "recorder";
+  if (state.sessionActive && view !== "recorder") {
+    window.history.replaceState(null, "", routeForView("recorder"));
+    showToast("Stop the active session before leaving the recorder.", true);
+    return;
+  }
+  if (updateRoute && window.location.hash !== routeForView(view)) {
+    window.location.hash = routeForView(view);
+    return;
+  }
   document.querySelectorAll(".view").forEach((element) => element.classList.toggle("active", element.id === `${view}-view`));
   document.querySelectorAll(".nav-link").forEach((element) => element.classList.toggle("active", element.dataset.view === view));
+  document.title = view === "sessions" ? "Sessions — Innercast" : "Innercast — Play the journey. Record the experience.";
   if (view === "sessions") loadSessions();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 elements.fileInput.addEventListener("change", () => selectFile(elements.fileInput.files?.[0]));
 elements.changeFile.addEventListener("click", () => resetSelectedFile());
-elements.audio.addEventListener("loadedmetadata", () => {
+elements.audio.addEventListener("loadedmetadata", async () => {
   state.duration = elements.audio.duration;
   elements.seek.max = String(state.duration);
   elements.duration.textContent = formatTimestamp(state.duration);
   elements.currentTime.textContent = "00:00";
   elements.modeOptions.disabled = false;
   validateConfiguration();
+  if (state.persistSourceOnMetadata && state.file) {
+    state.persistSourceOnMetadata = false;
+    const fileToSave = state.file;
+    try {
+      await repository.saveLastSelectedSource(fileToSave, state.duration);
+      if (state.file === fileToSave) {
+        elements.sourceMeta.textContent = `${fileToSave.type || "Unknown audio type"} · ${bytesLabel(fileToSave.size)} · Saved on this device`;
+      }
+      updateStorageEstimate();
+    } catch (error) {
+      const quota = error?.name === "QuotaExceededError" || /quota/i.test(error?.message || "");
+      showToast(quota
+        ? "This source plays normally, but there is not enough browser storage to restore it after a refresh."
+        : `This source plays normally, but it could not be saved for the next visit: ${error.message}`, true);
+    }
+  }
 });
-elements.audio.addEventListener("error", () => { showToast("Safari could not read this audio file. Try another format.", true); resetSelectedFile(); });
+elements.audio.addEventListener("error", async () => {
+  showToast("Safari could not read this audio file. Try another format.", true);
+  if (state.sourceFromStorage) {
+    try { await repository.deleteLastSelectedSource(); } catch { /* It can still be cleared in Safari settings. */ }
+  }
+  resetSelectedFile();
+});
 elements.audio.addEventListener("timeupdate", () => {
   if (!state.sessionActive) {
     elements.seek.value = String(elements.audio.currentTime);
@@ -415,9 +618,19 @@ elements.startButton.addEventListener("click", startSession);
 elements.pauseButton.addEventListener("click", pauseOrResume);
 elements.stopButton.addEventListener("click", () => stopSession("manual"));
 document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
+window.addEventListener("hashchange", () => switchView(viewFromRoute(), false));
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && state.sessionActive) showToast("Keep Innercast open and your phone unlocked. iOS may interrupt playback or recording in the background.", true);
 });
-window.addEventListener("pagehide", () => { if (state.sessionActive) state.microphone?.release(); clearSessionObjectUrls(); });
-
-loadSessions();
+window.addEventListener("pagehide", () => {
+  if (state.sessionActive) state.microphone?.release();
+  state.transcriptionJob?.transcriber.cancel();
+  clearSessionObjectUrls();
+});
+if (!["#/recorder", "#/sessions"].includes(window.location.hash)) {
+  window.history.replaceState(null, "", routeForView("recorder"));
+}
+const initialView = viewFromRoute();
+switchView(initialView, false);
+if (initialView !== "sessions") loadSessions();
+restoreLastSelectedSource();
