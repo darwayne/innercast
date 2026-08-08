@@ -1,9 +1,9 @@
 import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js";
 import { RecordingRepository } from "./repository.js";
-import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
+import { MicrophoneRecorder, SynchronizationController } from "./controllers.js?v=17";
 import { isLikelyAudioFile } from "./file-types.js";
-import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=14";
-import { ChunkedModelCache } from "./model-cache.js?v=14";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=17";
+import { ChunkedModelCache } from "./model-cache.js?v=17";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();

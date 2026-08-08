@@ -125,6 +125,7 @@ The static host only delivers application assets. Selected audio and microphone 
 
 - Safari or iOS may suspend playback/recording if the page is backgrounded or the phone locks. Innercast warns on visibility changes but cannot bypass OS restrictions.
 - MediaRecorder MIME support varies by Safari/iOS version, so Innercast probes MP4/AAC and WebM options at runtime and stores the selected MIME type.
+- Microphone capture disables echo cancellation while keeping noise suppression and automatic gain control enabled. This tests the WebKit-recommended workaround for playback ducking while retaining the other voice-processing features.
 - MediaRecorder is not sample-locked to the Web Audio clock. Start/pause/resume calls have small browser-controlled latency.
 - On-device transcription can be slow, memory intensive, and heat the phone. Keep Safari visible and the phone unlocked. iOS may terminate a memory-heavy tab, but the recording is already safely saved before transcription begins.
 - Transcription runs in sequential bounded sections (15 seconds for Moonshine v2 and up to 30 seconds for other models). Segment timestamps are approximate, and a word crossing a section boundary may be less accurate.

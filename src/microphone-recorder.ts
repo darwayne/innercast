@@ -39,7 +39,9 @@ export class MicrophoneRecorder {
       throw new Error("MediaRecorder is not supported by this Safari version. Update iOS and try again.");
     }
     this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      // Keep noise suppression and automatic gain while avoiding the echo-
+      // cancellation path that may trigger iOS playback ducking.
+      audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true },
     });
     const type = MicrophoneRecorder.chooseMimeType();
     this.recorder = new MediaRecorder(this.stream, type ? { mimeType: type } : undefined);
