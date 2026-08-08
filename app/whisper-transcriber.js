@@ -49,6 +49,26 @@ export const WHISPER_MODELS = Object.freeze({
       decoder_model_merged: "q8",
     },
   },
+  moonshineSmallStreaming: {
+    id: "Immortalizer/moonshine-streaming-small-onnx",
+    revision: "64ebc81403e04e7810c557615f4119717a6ae88f",
+    label: "Moonshine Small Streaming English — experimental",
+    approximateSize: "~216 MB download",
+    family: "moonshine-v2",
+    decoderLayers: 10,
+    attentionHeads: 8,
+    headDimension: 64,
+  },
+  moonshineMediumStreaming: {
+    id: "Immortalizer/moonshine-streaming-medium-onnx",
+    revision: "0174b1111690d2f883c228f4d773243264569e5d",
+    label: "Moonshine Medium Streaming English — bleeding edge",
+    approximateSize: "~363 MB download",
+    family: "moonshine-v2",
+    decoderLayers: 14,
+    attentionHeads: 10,
+    headDimension: 64,
+  },
 });
 
 const TARGET_SAMPLE_RATE = 16_000;
@@ -108,7 +128,8 @@ export class OnDeviceWhisperTranscriber {
 
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const worker = new Worker(new URL("./whisper-worker.js?v=8", import.meta.url), { type: "module" });
+      const workerFile = model.family === "moonshine-v2" ? "./moonshine-v2-worker.js?v=10" : "./whisper-worker.js?v=10";
+      const worker = new Worker(new URL(workerFile, import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => {
         worker.terminate();
@@ -135,6 +156,10 @@ export class OnDeviceWhisperTranscriber {
         modelKey,
         modelId: model.id,
         modelFamily: model.family || "whisper",
+        revision: model.revision,
+        decoderLayers: model.decoderLayers,
+        attentionHeads: model.attentionHeads,
+        headDimension: model.headDimension,
         device: model.device || "wasm",
         dtype: model.dtype || "q8",
         recordingSourceOffsetSeconds,

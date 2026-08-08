@@ -25,6 +25,8 @@ const tests = [
   ["offer Distil-Large v3.5 English", () => equal(WHISPER_MODELS.large.id, "distil-whisper/distil-large-v3.5-ONNX")],
   ["offer Moonshine Tiny English", () => equal(WHISPER_MODELS.moonshineTiny.id, "onnx-community/moonshine-tiny-ONNX")],
   ["offer Moonshine Base English", () => equal(WHISPER_MODELS.moonshineBase.id, "onnx-community/moonshine-base-ONNX")],
+  ["offer Moonshine Small Streaming English", () => equal(WHISPER_MODELS.moonshineSmallStreaming.id, "Immortalizer/moonshine-streaming-small-onnx")],
+  ["offer Moonshine Medium Streaming English", () => equal(WHISPER_MODELS.moonshineMediumStreaming.id, "Immortalizer/moonshine-streaming-medium-onnx")],
 ];
 
 function equal(actual, expected) { if (actual !== expected) throw new Error(`expected ${expected}, received ${actual}`); }

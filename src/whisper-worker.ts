@@ -1,7 +1,7 @@
 // Browser worker counterpart to whisper-transcriber.ts. The checked-in app/
 // JavaScript is served directly so Innercast needs no local build toolchain.
 import { env, pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
-import { ChunkedModelCache } from "../app/model-cache.js";
+import { ChunkedModelCache } from "../app/model-cache.js?v=10";
 import type { WhisperModelKey, WhisperTranscript } from "./whisper-transcriber.js";
 
 env.useBrowserCache = false;

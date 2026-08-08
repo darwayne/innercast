@@ -32,8 +32,8 @@ export interface SavedSession {
     text: string;
     language: string;
     /** web-speech-api is retained only so sessions saved by older builds remain readable. */
-    provider: "whisper-transformers-js" | "moonshine-transformers-js" | "web-speech-api";
-    model?: "tiny" | "base" | "small" | "medium" | "large" | "moonshineTiny" | "moonshineBase";
+    provider: "whisper-transformers-js" | "moonshine-transformers-js" | "moonshine-v2-onnxruntime-web" | "web-speech-api";
+    model?: "tiny" | "base" | "small" | "medium" | "large" | "moonshineTiny" | "moonshineBase" | "moonshineSmallStreaming" | "moonshineMediumStreaming";
     modelId?: string;
     device?: "wasm" | "webgpu";
     createdAt?: string;

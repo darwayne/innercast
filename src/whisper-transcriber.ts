@@ -1,4 +1,4 @@
-export type WhisperModelKey = "tiny" | "base" | "small" | "medium" | "large" | "moonshineTiny" | "moonshineBase";
+export type WhisperModelKey = "tiny" | "base" | "small" | "medium" | "large" | "moonshineTiny" | "moonshineBase" | "moonshineSmallStreaming" | "moonshineMediumStreaming";
 
 export interface WhisperModelChoice {
   id: string;
@@ -6,7 +6,11 @@ export interface WhisperModelChoice {
   approximateSize: string;
   device?: "wasm" | "webgpu";
   dtype?: string | Record<string, string>;
-  family?: "whisper" | "moonshine";
+  family?: "whisper" | "moonshine" | "moonshine-v2";
+  revision?: string;
+  decoderLayers?: number;
+  attentionHeads?: number;
+  headDimension?: number;
 }
 
 export interface TranscriptionProgress {
@@ -18,7 +22,7 @@ export interface TranscriptionProgress {
 export interface WhisperTranscript {
   text: string;
   language: "en";
-  provider: "whisper-transformers-js" | "moonshine-transformers-js";
+  provider: "whisper-transformers-js" | "moonshine-transformers-js" | "moonshine-v2-onnxruntime-web";
   model: WhisperModelKey;
   modelId: string;
   device: "wasm" | "webgpu";
@@ -64,6 +68,20 @@ export const WHISPER_MODELS: Readonly<Record<WhisperModelKey, WhisperModelChoice
     approximateSize: "~127 MB download",
     family: "moonshine",
     dtype: { encoder_model: "fp32", decoder_model_merged: "q8" },
+  },
+  moonshineSmallStreaming: {
+    id: "Immortalizer/moonshine-streaming-small-onnx",
+    revision: "64ebc81403e04e7810c557615f4119717a6ae88f",
+    label: "Moonshine Small Streaming English — experimental",
+    approximateSize: "~216 MB download", family: "moonshine-v2",
+    decoderLayers: 10, attentionHeads: 8, headDimension: 64,
+  },
+  moonshineMediumStreaming: {
+    id: "Immortalizer/moonshine-streaming-medium-onnx",
+    revision: "0174b1111690d2f883c228f4d773243264569e5d",
+    label: "Moonshine Medium Streaming English — bleeding edge",
+    approximateSize: "~363 MB download", family: "moonshine-v2",
+    decoderLayers: 14, attentionHeads: 10, headDimension: 64,
   },
 });
 
@@ -113,7 +131,8 @@ export class OnDeviceWhisperTranscriber {
     const audio = await decodeToWhisperAudio(blob, onProgress, () => this.cancelled);
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const worker = new Worker(new URL("../app/whisper-worker.js?v=8", import.meta.url), { type: "module" });
+      const workerFile = model.family === "moonshine-v2" ? "../app/moonshine-v2-worker.js?v=10" : "../app/whisper-worker.js?v=10";
+      const worker = new Worker(new URL(workerFile, import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => { worker.terminate(); this.worker = null; this.activeReject = null; };
       worker.onmessage = (event: MessageEvent) => {
@@ -125,7 +144,8 @@ export class OnDeviceWhisperTranscriber {
       const model = WHISPER_MODELS[modelKey];
       worker.postMessage({
         type: "transcribe", audio, modelKey, modelId: model.id,
-        modelFamily: model.family ?? "whisper",
+        modelFamily: model.family ?? "whisper", revision: model.revision,
+        decoderLayers: model.decoderLayers, attentionHeads: model.attentionHeads, headDimension: model.headDimension,
         device: model.device ?? "wasm", dtype: model.dtype ?? "q8", recordingSourceOffsetSeconds,
       }, [audio.buffer]);
     });
