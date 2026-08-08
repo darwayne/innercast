@@ -1,4 +1,4 @@
-export type WhisperModelKey = "tiny" | "base" | "small" | "medium";
+export type WhisperModelKey = "tiny" | "base" | "small" | "medium" | "large" | "moonshineTiny" | "moonshineBase";
 
 export interface WhisperModelChoice {
   id: string;
@@ -6,6 +6,7 @@ export interface WhisperModelChoice {
   approximateSize: string;
   device?: "wasm" | "webgpu";
   dtype?: string | Record<string, string>;
+  family?: "whisper" | "moonshine";
 }
 
 export interface TranscriptionProgress {
@@ -17,7 +18,7 @@ export interface TranscriptionProgress {
 export interface WhisperTranscript {
   text: string;
   language: "en";
-  provider: "whisper-transformers-js";
+  provider: "whisper-transformers-js" | "moonshine-transformers-js";
   model: WhisperModelKey;
   modelId: string;
   device: "wasm" | "webgpu";
@@ -32,13 +33,37 @@ export interface WhisperTranscript {
 }
 
 export const WHISPER_MODELS: Readonly<Record<WhisperModelKey, WhisperModelChoice>> = Object.freeze({
-  tiny: { id: "onnx-community/whisper-tiny.en", label: "Tiny English — fastest", approximateSize: "~45 MB download" },
-  base: { id: "onnx-community/whisper-base.en", label: "Base English — balanced", approximateSize: "~80 MB download" },
-  small: { id: "onnx-community/whisper-small.en", label: "Small English — experimental", approximateSize: "~250 MB download" },
+  tiny: { id: "onnx-community/whisper-tiny.en", label: "Whisper Tiny English — fastest", approximateSize: "~45 MB download" },
+  base: { id: "onnx-community/whisper-base.en", label: "Whisper Base English — balanced", approximateSize: "~80 MB download" },
+  small: { id: "onnx-community/whisper-small.en", label: "Whisper Small English — experimental", approximateSize: "~250 MB download" },
   medium: {
     id: "distil-whisper/distil-medium.en",
     label: "Distil-Medium English — experimental",
     approximateSize: "~405 MB download",
+  },
+  large: {
+    id: "distil-whisper/distil-large-v3.5-ONNX",
+    label: "Distil-Large v3.5 English — bleeding edge",
+    approximateSize: "~540 MB download",
+    device: "webgpu",
+    dtype: {
+      encoder_model: "q4f16",
+      decoder_model_merged: "q4f16",
+    },
+  },
+  moonshineTiny: {
+    id: "onnx-community/moonshine-tiny-ONNX",
+    label: "Moonshine Tiny English — lightweight",
+    approximateSize: "~55 MB download",
+    family: "moonshine",
+    dtype: { encoder_model: "fp32", decoder_model_merged: "q8" },
+  },
+  moonshineBase: {
+    id: "onnx-community/moonshine-base-ONNX",
+    label: "Moonshine Base English — recommended",
+    approximateSize: "~127 MB download",
+    family: "moonshine",
+    dtype: { encoder_model: "fp32", decoder_model_merged: "q8" },
   },
 });
 
@@ -83,12 +108,12 @@ export class OnDeviceWhisperTranscriber {
     recordingSourceOffsetSeconds: number,
     onProgress: (update: TranscriptionProgress) => void = () => undefined,
   ): Promise<WhisperTranscript> {
-    if (!WHISPER_MODELS[modelKey]) throw new Error("Choose a supported Whisper model.");
+    if (!WHISPER_MODELS[modelKey]) throw new Error("Choose a supported transcription model.");
     this.cancelled = false;
     const audio = await decodeToWhisperAudio(blob, onProgress, () => this.cancelled);
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const worker = new Worker(new URL("../app/whisper-worker.js?v=5", import.meta.url), { type: "module" });
+      const worker = new Worker(new URL("../app/whisper-worker.js?v=8", import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => { worker.terminate(); this.worker = null; this.activeReject = null; };
       worker.onmessage = (event: MessageEvent) => {
@@ -96,10 +121,11 @@ export class OnDeviceWhisperTranscriber {
         finish();
         event.data.type === "complete" ? resolve(event.data.transcription) : reject(new Error(event.data.error));
       };
-      worker.onerror = () => { finish(); reject(new Error("Whisper could not load.")); };
+      worker.onerror = () => { finish(); reject(new Error("The transcription model could not load.")); };
       const model = WHISPER_MODELS[modelKey];
       worker.postMessage({
         type: "transcribe", audio, modelKey, modelId: model.id,
+        modelFamily: model.family ?? "whisper",
         device: model.device ?? "wasm", dtype: model.dtype ?? "q8", recordingSourceOffsetSeconds,
       }, [audio.buffer]);
     });

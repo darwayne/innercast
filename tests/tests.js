@@ -22,6 +22,9 @@ const tests = [
   ["offer the base English Whisper model", () => equal(WHISPER_MODELS.base.id, "onnx-community/whisper-base.en")],
   ["offer the small English Whisper model", () => equal(WHISPER_MODELS.small.id, "onnx-community/whisper-small.en")],
   ["offer Distil-Medium English", () => equal(WHISPER_MODELS.medium.id, "distil-whisper/distil-medium.en")],
+  ["offer Distil-Large v3.5 English", () => equal(WHISPER_MODELS.large.id, "distil-whisper/distil-large-v3.5-ONNX")],
+  ["offer Moonshine Tiny English", () => equal(WHISPER_MODELS.moonshineTiny.id, "onnx-community/moonshine-tiny-ONNX")],
+  ["offer Moonshine Base English", () => equal(WHISPER_MODELS.moonshineBase.id, "onnx-community/moonshine-base-ONNX")],
 ];
 
 function equal(actual, expected) { if (actual !== expected) throw new Error(`expected ${expected}, received ${actual}`); }

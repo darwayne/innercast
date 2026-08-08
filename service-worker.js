@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "innercast-";
-const APP_CACHE = `${CACHE_PREFIX}app-v6`;
+const APP_CACHE = `${CACHE_PREFIX}app-v8`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-v1`;
 
 const APP_SHELL = [
@@ -8,13 +8,14 @@ const APP_SHELL = [
   "./styles.css",
   "./manifest.webmanifest",
   "./assets/innercast-icon.svg",
-  "./app/app.js?v=6",
+  "./app/app.js?v=8",
   "./app/controllers.js",
   "./app/file-types.js",
   "./app/repository.js",
   "./app/timestamp.js",
-  "./app/whisper-transcriber.js?v=6",
-  "./app/whisper-worker.js?v=6",
+  "./app/whisper-transcriber.js?v=8",
+  "./app/whisper-worker.js?v=8",
+  "./app/model-cache.js?v=8",
 ];
 
 const CACHEABLE_RUNTIME_HOSTS = new Set([
@@ -82,8 +83,8 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Transformers.js and ONNX Runtime are pinned remote application assets.
-  // Whisper model files use Transformers.js's own browser cache, avoiding a
-  // second large model copy in this service worker cache.
+  // Transcription model files use their dedicated cache, avoiding a second
+  // large model copy in this service worker cache.
   if (CACHEABLE_RUNTIME_HOSTS.has(url.hostname)) {
     event.respondWith(cacheFirst(request, RUNTIME_CACHE));
   }

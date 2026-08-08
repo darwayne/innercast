@@ -2,7 +2,7 @@ import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js"
 import { RecordingRepository } from "./repository.js";
 import { MicrophoneRecorder, SynchronizationController } from "./controllers.js";
 import { isLikelyAudioFile } from "./file-types.js";
-import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=6";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=8";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = new RecordingRepository();
@@ -410,7 +410,7 @@ function renderSavedTranscript(article, session) {
   const modelChoice = WHISPER_MODELS[session.transcription.model];
   const modelLabel = modelChoice
     ? ` · ${modelChoice.label.split(" —")[0]}`
-    : session.transcription.model ? ` · Whisper ${session.transcription.model}` : "";
+    : session.transcription.model ? ` · ${session.transcription.model}` : "";
   summary.textContent = `Transcript · ${session.transcription.language || "Unknown language"}${modelLabel}`;
   const transcript = document.createElement("p");
   transcript.textContent = session.transcription.text || session.transcription.errorMessage || "No speech was recognized.";
@@ -488,7 +488,7 @@ function createTranscriptionPanel(session) {
   panel.className = "transcription-panel";
   panel.innerHTML = `
     <div><strong>On-device transcription</strong><span>Runs after recording so it cannot interrupt microphone capture.</span></div>
-    <div class="transcription-controls"><select aria-label="Whisper model"></select><button type="button"></button></div>
+    <div class="transcription-controls"><select aria-label="Transcription model"></select><button type="button"></button></div>
     <progress class="hidden" max="1" value="0"></progress>
     <small>First use downloads the selected model. Audio remains on this device.</small>`;
   const select = panel.querySelector("select");

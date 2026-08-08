@@ -2,7 +2,7 @@
 
 **Play the journey. Record the experience.**
 
-Innercast is a browser-only, device-local audio companion. It plays a local source file while recording the microphone, preserves a simple source-to-microphone timeline mapping, and saves completed recordings as Blobs in IndexedDB. It has no backend, analytics, or cloud storage. Optional post-recording transcription runs Whisper inside the browser; microphone audio is never sent to a transcription service.
+Innercast is a browser-only, device-local audio companion. It plays a local source file while recording the microphone, preserves a simple source-to-microphone timeline mapping, and saves completed recordings as Blobs in IndexedDB. It has no backend, analytics, or cloud storage. Optional post-recording transcription runs Whisper or Moonshine inside the browser; microphone audio is never sent to a transcription service.
 
 The source picker explicitly supports AAC, M4A, MP4 audio, MP3, FLAC, WAV, AIFF, and CAF. Because iOS Files sometimes reports local audio with an empty or generic MIME type, Innercast also recognizes these filename extensions and lets the browser's audio decoder make the final compatibility decision. The most recently selected playable source file is saved as a Blob in IndexedDB and restored automatically after a refresh. Selecting another source replaces it, so only one reusable source copy is retained.
 
@@ -68,7 +68,7 @@ For reliable offline preparation:
 4. Optionally choose Safari's **Share → Add to Home Screen** for a standalone launcher.
 5. Test by disconnecting from the network and refreshing Innercast.
 
-The service worker deliberately does not duplicate Whisper files. Transformers.js maintains its own browser cache for those large models. Safari can evict both Cache Storage and IndexedDB under storage pressure, and clearing website data removes the app's offline assets and recordings. Export important recordings separately.
+The service worker deliberately does not duplicate transcription-model files. Innercast streams uncached model responses into a dedicated IndexedDB model cache in 4 MB Blob chunks. Interrupted downloads resume with an HTTP Range request when the model host supports it, while models cached by older Innercast versions remain usable from Transformers.js's browser cache. Safari can evict both Cache Storage and IndexedDB under storage pressure, and clearing website data removes the app's offline assets, models, and recordings. Export important recordings separately.
 
 ## How synchronization works
 
@@ -98,9 +98,11 @@ Completed microphone Blobs and metadata are stored directly in the versioned `sy
 
 The Record and Sessions screens use static-host-safe hash routes: `#/recorder` and `#/sessions`. Refreshing, bookmarking, and browser back/forward navigation preserve the selected screen without requiring server-side route rewriting.
 
-Each saved session offers optional on-device Whisper transcription. Choose **Tiny English** (fastest, roughly 45 MB of quantized model data), **Base English** (balanced, roughly 80 MB), experimental **Small English** (roughly 250 MB), or experimental **Distil-Medium English** (roughly 405 MB). Leave the Sessions screen open while it runs. Innercast first saves the recording and only then decodes and transcribes it in a Web Worker, so transcription cannot compete with or interrupt active microphone capture. Thirty-second chunks are processed sequentially and the completed text plus approximate microphone/source timestamps are written back to the same IndexedDB session.
+Each saved session offers optional on-device Whisper and Moonshine transcription. Whisper choices are **Tiny English** (roughly 45 MB), **Base English** (roughly 80 MB), experimental **Small English** (roughly 250 MB), experimental **Distil-Medium English** (roughly 405 MB), and bleeding-edge **Distil-Large v3.5 English** (roughly 540 MB). Moonshine choices are **Moonshine Tiny English** (roughly 55 MB) and **Moonshine Base English** (roughly 127 MB). The Moonshine sizes use the official FP32-encoder/q8-decoder WASM configuration. Distil-Large uses q4f16 weights and requires WebGPU. Leave the Sessions screen open while it runs. Innercast first saves the recording and only then decodes and transcribes it in a Web Worker, so transcription cannot compete with or interrupt active microphone capture. Thirty-second sections are processed sequentially and the completed text plus approximate microphone/source timestamps are written back to the same IndexedDB session. Whisper sections are zero-padded to their required window; Moonshine receives only the actual audio duration.
 
-The first use of a model requires internet access to download the pinned Transformers.js runtime and quantized Whisper model from their public asset hosts. Browser caching normally avoids repeating the model download, but Safari may evict cached assets. Inference is local: only application/runtime/model files are downloaded, and the recording is never uploaded. All choices are English-only. Small and Distil-Medium are experimental. Distil-Medium has a substantially smaller decoder than full Medium and runs on the same WASM/q8 path as the working models, but it retains Medium's encoder and may still encounter Safari memory pressure.
+The first use of a model requires internet access to download the pinned Transformers.js runtime and selected model from their public asset hosts. Downloaded chunks are persisted as they arrive, so retrying after a network interruption or WebKit worker termination can continue instead of retaining or redownloading one enormous response. Browser storage normally avoids repeating the model download, but Safari may evict cached assets. Inference is local: only application/runtime/model files are downloaded, and the recording is never uploaded. All current choices are English-only. Small, Distil-Medium, and Distil-Large are experimental. Distil-Medium runs on the WASM/q8 path. Distil-Large uses WebGPU/q4f16 and is not expected to work on browsers without WebGPU or devices that cannot allocate its final inference tensors.
+
+Moonshine's newer v2 Tiny Streaming, Small Streaming, and Medium Streaming models are not shown because their published deployment path currently uses Moonshine's native C++ runtime and memory-mappable ORT files, not the browser Transformers.js pipeline used by this static application. Tiny and Base are the complete set of browser-ready English Moonshine sizes available through the current pipeline.
 
 Clearing Safari website data or using private browsing can remove recordings. Export anything important. The first version assembles each recording in memory before saving, which is appropriate for the expected recordings of roughly 50 MB or less; the recorder already isolates chunk collection so incremental persistence can be added later.
 
@@ -124,8 +126,8 @@ The static host only delivers application assets. Selected audio and microphone 
 - Safari or iOS may suspend playback/recording if the page is backgrounded or the phone locks. Innercast warns on visibility changes but cannot bypass OS restrictions.
 - MediaRecorder MIME support varies by Safari/iOS version, so Innercast probes MP4/AAC and WebM options at runtime and stores the selected MIME type.
 - MediaRecorder is not sample-locked to the Web Audio clock. Start/pause/resume calls have small browser-controlled latency.
-- On-device Whisper can be slow, memory intensive, and heat the phone. Keep Safari visible and the phone unlocked. iOS may terminate a memory-heavy tab, but the recording is already safely saved before transcription begins.
-- Whisper is run in sequential 30-second sections. Segment timestamps are approximate, and a word crossing a section boundary may be less accurate.
+- On-device transcription can be slow, memory intensive, and heat the phone. Keep Safari visible and the phone unlocked. iOS may terminate a memory-heavy tab, but the recording is already safely saved before transcription begins.
+- Transcription runs in sequential sections of up to 30 seconds. Segment timestamps are approximate, and a word crossing a section boundary may be less accurate.
 - On supported iOS releases, Innercast explicitly selects Safari's `playback` audio session for previews and saved recordings, and `play-and-record` during capture. This avoids a WebKit routing state where a saved Blob appears to play silently until another media file is played.
 - IndexedDB quota is device- and browser-dependent. There is no guaranteed capacity, and private browsing is unsuitable for durable archives.
 - Incoming calls, route changes, device disconnection, or revoked microphone permission may interrupt a session.
@@ -138,7 +140,7 @@ Run:
 make test PORT=8081
 ```
 
-Then open <http://127.0.0.1:8081/tests/>. The dependency-free browser suite covers timestamp parsing, invalid values, offset validation, source/microphone alignment calculations, audio file recognition, and the available Whisper model configuration.
+Then open <http://127.0.0.1:8081/tests/>. The dependency-free browser suite covers timestamp parsing, invalid values, offset validation, source/microphone alignment calculations, audio file recognition, and the available transcription-model configuration.
 
 ## Project structure
 
@@ -151,7 +153,7 @@ app/repository.js            Versioned IndexedDB sessions and last-source storag
 app/timestamp.js             Timestamp and alignment helpers
 app/file-types.js            Robust audio file recognition
 app/whisper-transcriber.js   Post-recording decode and worker lifecycle
-app/whisper-worker.js        On-device Whisper inference and chunk mapping
+app/whisper-worker.js        On-device Whisper/Moonshine inference and chunk mapping
 service-worker.js            Offline application/runtime caching
 manifest.webmanifest         Home Screen installation metadata
 assets/innercast-icon.svg    Install and browser icon

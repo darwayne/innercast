@@ -1,17 +1,17 @@
 export const WHISPER_MODELS = Object.freeze({
   tiny: {
     id: "onnx-community/whisper-tiny.en",
-    label: "Tiny English — fastest",
+    label: "Whisper Tiny English — fastest",
     approximateSize: "~45 MB download",
   },
   base: {
     id: "onnx-community/whisper-base.en",
-    label: "Base English — balanced",
+    label: "Whisper Base English — balanced",
     approximateSize: "~80 MB download",
   },
   small: {
     id: "onnx-community/whisper-small.en",
-    label: "Small English — experimental",
+    label: "Whisper Small English — experimental",
     approximateSize: "~250 MB download",
   },
   medium: {
@@ -19,12 +19,42 @@ export const WHISPER_MODELS = Object.freeze({
     label: "Distil-Medium English — experimental",
     approximateSize: "~405 MB download",
   },
+  large: {
+    id: "distil-whisper/distil-large-v3.5-ONNX",
+    label: "Distil-Large v3.5 English — bleeding edge",
+    approximateSize: "~540 MB download",
+    device: "webgpu",
+    dtype: {
+      encoder_model: "q4f16",
+      decoder_model_merged: "q4f16",
+    },
+  },
+  moonshineTiny: {
+    id: "onnx-community/moonshine-tiny-ONNX",
+    label: "Moonshine Tiny English — lightweight",
+    approximateSize: "~55 MB download",
+    family: "moonshine",
+    dtype: {
+      encoder_model: "fp32",
+      decoder_model_merged: "q8",
+    },
+  },
+  moonshineBase: {
+    id: "onnx-community/moonshine-base-ONNX",
+    label: "Moonshine Base English — recommended",
+    approximateSize: "~127 MB download",
+    family: "moonshine",
+    dtype: {
+      encoder_model: "fp32",
+      decoder_model_merged: "q8",
+    },
+  },
 });
 
 const TARGET_SAMPLE_RATE = 16_000;
 
 /**
- * Decodes a completed MediaRecorder Blob and converts it to Whisper's expected
+ * Decodes a completed MediaRecorder Blob and converts it to the models' expected
  * 16 kHz mono PCM. This happens only after the recording is safely in IndexedDB,
  * so model loading or transcription can never interfere with capture.
  */
@@ -67,7 +97,7 @@ export class OnDeviceWhisperTranscriber {
   }
 
   async transcribe(blob, modelKey, recordingSourceOffsetSeconds, onProgress = () => {}) {
-    if (!WHISPER_MODELS[modelKey]) throw new Error("Choose a supported Whisper model.");
+    if (!WHISPER_MODELS[modelKey]) throw new Error("Choose a supported transcription model.");
     if (!(blob instanceof Blob) || !blob.size) throw new Error("This recording has no audio to transcribe.");
     if (!window.Worker) throw new Error("Web Workers are not supported by this Safari version.");
 
@@ -78,7 +108,7 @@ export class OnDeviceWhisperTranscriber {
 
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const worker = new Worker(new URL("./whisper-worker.js?v=6", import.meta.url), { type: "module" });
+      const worker = new Worker(new URL("./whisper-worker.js?v=8", import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => {
         worker.terminate();
@@ -97,13 +127,14 @@ export class OnDeviceWhisperTranscriber {
       };
       worker.onerror = () => {
         finish();
-        reject(new Error("Whisper could not load. The first use requires internet access to download the transcription engine and model."));
+        reject(new Error("The transcription model could not load. First use requires internet access to download the engine and model."));
       };
       worker.postMessage({
         type: "transcribe",
         audio,
         modelKey,
         modelId: model.id,
+        modelFamily: model.family || "whisper",
         device: model.device || "wasm",
         dtype: model.dtype || "q8",
         recordingSourceOffsetSeconds,
