@@ -43,7 +43,7 @@
           <input id="audio-file" type="file" accept="audio/*,.aac,.m4a,.mp4,.mp3,.flac,.wav,.wave,.aif,.aiff,.caf" hidden />
           <label id="file-picker" class="file-picker" for="audio-file">
             <span class="file-icon" aria-hidden="true">♫</span>
-            <span><strong>Choose an audio file</strong><small>AAC, M4A, MP3, FLAC, WAV, AIFF, CAF, or any format Safari can play</small></span>
+            <span><strong>Choose an audio file</strong><small>AAC, M4A, MP3, FLAC, WAV, AIFF, CAF, or any format your browser can play</small></span>
             <span class="pick-action">Browse</span>
           </label>
           <div id="source-details" class="source-details hidden">
@@ -91,6 +91,7 @@
         </section>
 
         <button id="start-session" class="primary-button" disabled><span>Start session</span><span aria-hidden="true">→</span></button>
+        <p class="context-setting">Microphone: <strong id="selected-microphone-label">Automatic</strong> · <a href="#/settings" data-settings-from="recorder">Change in Settings</a></p>
         <p class="device-reminder">Keep this page open and your phone unlocked while recording. Headphones recommended.</p>
 
         <section id="active-session" class="active-session hidden" aria-live="polite">
@@ -132,8 +133,21 @@
       <section id="settings-view" class="view" aria-labelledby="settings-title">
         <div class="sessions-header">
           <div><p class="eyebrow">On-device preferences</p><h1 id="settings-title">Settings</h1></div>
-          <button class="secondary-button" data-view="sessions">Back to sessions</button>
+          <button id="settings-back" class="secondary-button">Back</button>
         </div>
+        <section class="card settings-card" aria-labelledby="microphone-settings-title">
+          <div class="step-heading">
+            <span class="step-number">MIC</span>
+            <div><h2 id="microphone-settings-title">Recording microphone</h2><p>Choose which available input Innercast asks your browser to use.</p></div>
+          </div>
+          <label class="settings-field" for="microphone-setting">
+            <span>Input device</span>
+            <select id="microphone-setting"><option value="">Automatic (browser default)</option></select>
+          </label>
+          <p id="microphone-setting-description" class="settings-description">Your browser may require microphone permission before it reveals available input names.</p>
+          <button id="refresh-microphones" class="secondary-button settings-action" type="button">Find microphones</button>
+          <p class="settings-description">For Bluetooth headphones, choosing the device microphone may preserve stereo headphone playback. The browser and operating system ultimately control audio routing and may not expose every connected microphone.</p>
+        </section>
         <section class="card settings-card" aria-labelledby="transcription-settings-title">
           <div class="step-heading">
             <span class="step-number">AI</span>
@@ -150,6 +164,6 @@
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app/app.js?v=19"></script>
+    <script type="module" src="app/app.js?v=26"></script>
   </body>
 </html>

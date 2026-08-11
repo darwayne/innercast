@@ -43,7 +43,7 @@ async function createSession(url, label) {
       graphOptimizationLevel: "all",
     });
   } catch (error) {
-    throw new Error(`Safari could not load the ${label}. It may have run out of memory. ${error?.message || error}`);
+    throw new Error(`The browser could not load the ${label}. It may have run out of memory. ${error?.message || error}`);
   }
 }
 

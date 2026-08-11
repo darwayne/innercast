@@ -78,7 +78,7 @@ self.onmessage = async (event) => {
       });
       // Innercast already owns deterministic chunk-to-mic/source timing. Avoid
       // Whisper's timestamp token decoder here; it is unnecessary and has been
-      // less reliable for short Base-model input in Mobile Safari.
+      // less reliable for short Base-model input in mobile browsers.
       const result = await recognize(chunk);
       const chunkStartSeconds = firstFrame / SAMPLE_RATE;
       const text = (result.text || "").trim();

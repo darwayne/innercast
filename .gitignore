@@ -37,6 +37,18 @@ coverage/
 __pycache__/
 *.py[cod]
 
+# Xcode generated and per-user state
+DerivedData/
+*.xcuserstate
+xcuserdata/
+ios/Config/Signing.local.xcconfig
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+*.ipa
+*.dSYM
+*.dSYM.zip
+
 # Locally downloaded transcription models and test recordings
 models/
 recordings/

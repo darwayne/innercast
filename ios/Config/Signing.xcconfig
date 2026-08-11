@@ -1,0 +1,7 @@
+// Shared developer configuration. Each developer supplies their own signing
+// team and bundle identifier in Signing.local.xcconfig, which is excluded from Git.
+INNERCAST_BUNDLE_IDENTIFIER = com.example.innercast
+#include? "Signing.local.xcconfig"
+
+DEVELOPMENT_TEAM = $(INNERCAST_DEVELOPMENT_TEAM)
+PRODUCT_BUNDLE_IDENTIFIER = $(INNERCAST_BUNDLE_IDENTIFIER)

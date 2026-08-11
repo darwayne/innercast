@@ -72,7 +72,7 @@ async function decodeToWhisperAudio(blob, onProgress, isCancelled) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   const OfflineAudioContextClass = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   if (!AudioContextClass || !OfflineAudioContextClass) {
-    throw new Error("On-device audio decoding is not supported by this Safari version.");
+    throw new Error("On-device audio decoding is not supported by this browser version.");
   }
 
   onProgress({ phase: "decoding", message: "Preparing recording…", progress: 0 });
@@ -93,7 +93,7 @@ async function decodeToWhisperAudio(blob, onProgress, isCancelled) {
     return new Float32Array(rendered.getChannelData(0));
   } catch (error) {
     if (/cancelled/i.test(error?.message || "")) throw error;
-    throw new Error(`Safari could not prepare this recording for transcription: ${error?.message || error}`);
+    throw new Error(`The browser could not prepare this recording for transcription: ${error?.message || error}`);
   } finally {
     await context.close().catch(() => {});
   }
@@ -109,7 +109,7 @@ export class OnDeviceWhisperTranscriber {
   async transcribe(blob, modelKey, recordingSourceOffsetSeconds, onProgress = () => {}) {
     if (!WHISPER_MODELS[modelKey]) throw new Error("Choose a supported transcription model.");
     if (!(blob instanceof Blob) || !blob.size) throw new Error("This recording has no audio to transcribe.");
-    if (!window.Worker) throw new Error("Web Workers are not supported by this Safari version.");
+    if (!window.Worker) throw new Error("Web Workers are not supported by this browser version.");
 
     this.cancelled = false;
     const model = WHISPER_MODELS[modelKey];
@@ -118,7 +118,7 @@ export class OnDeviceWhisperTranscriber {
 
     return new Promise((resolve, reject) => {
       this.activeReject = reject;
-      const workerFile = model.family === "moonshine-v2" ? "./moonshine-v2-worker.js?v=18" : "./whisper-worker.js?v=18";
+      const workerFile = model.family === "moonshine-v2" ? "./moonshine-v2-worker.js?v=19" : "./whisper-worker.js?v=19";
       const worker = new Worker(new URL(workerFile, import.meta.url), { type: "module" });
       this.worker = worker;
       const finish = () => {
