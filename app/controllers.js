@@ -4,6 +4,8 @@ export class MicrophoneRecorder {
     this.recorder = null;
     this.chunks = [];
     this.mimeType = "";
+    this.deviceId = "";
+    this.deviceLabel = "";
     this.startClockTime = null;
     this.pausedClockTime = null;
     this.accumulatedPauseSeconds = 0;
@@ -18,15 +20,18 @@ export class MicrophoneRecorder {
     return choices.find((type) => MediaRecorder.isTypeSupported(type)) || "";
   }
 
-  async prepare() {
+  async prepare(deviceId = "") {
     if (!window.isSecureContext) throw new Error("Microphone access requires HTTPS. When using Tailscale, run “make tailscale” and open the https://…ts.net address it displays.");
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not expose microphone access. Open Innercast directly in Safari and check the site's microphone permission.");
     if (!window.MediaRecorder) throw new Error("MediaRecorder is not supported by this Safari version. Update iOS and try again.");
     // Keep noise suppression and automatic gain enabled while avoiding the
     // echo-cancellation path that may trigger iOS playback ducking.
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true },
-    });
+    const audio = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
+    if (deviceId) audio.deviceId = { exact: deviceId };
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio });
+    const track = this.stream.getAudioTracks()[0];
+    this.deviceId = track?.getSettings?.().deviceId || deviceId;
+    this.deviceLabel = track?.label || "";
     const type = MicrophoneRecorder.chooseMimeType();
     const options = type ? { mimeType: type } : undefined;
     this.recorder = new MediaRecorder(this.stream, options);

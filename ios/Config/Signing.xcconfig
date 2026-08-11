@@ -1,0 +1,5 @@
+// Shared signing configuration. Each developer supplies their own team ID in
+// Signing.local.xcconfig, which is intentionally excluded from Git.
+#include? "Signing.local.xcconfig"
+
+DEVELOPMENT_TEAM = $(INNERCAST_DEVELOPMENT_TEAM)

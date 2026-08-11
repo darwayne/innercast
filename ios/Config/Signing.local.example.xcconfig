@@ -1,0 +1,3 @@
+// Copy this file to Signing.local.xcconfig and replace the example value with
+// your Apple Developer team ID. The local file is excluded from Git.
+INNERCAST_DEVELOPMENT_TEAM = YOUR_TEAM_ID

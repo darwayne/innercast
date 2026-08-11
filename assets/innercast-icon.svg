@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Innercast">
-  <rect width="512" height="512" rx="112" fill="#214d42"/>
+  <rect width="512" height="512" fill="#214d42"/>
   <circle cx="256" cy="256" r="154" fill="#f5f0e7"/>
   <g fill="#d95f41">
     <rect x="176" y="216" width="24" height="80" rx="12"/>

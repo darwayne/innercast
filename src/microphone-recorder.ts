@@ -16,6 +16,8 @@ export class MicrophoneRecorder {
   private finalBlobPromise: Promise<Blob> | null = null;
   private resolveFinalBlob: ((blob: Blob) => void) | null = null;
   mimeType = "";
+  deviceId = "";
+  deviceLabel = "";
   onUnexpectedStop: ((error: Error) => void) | null = null;
 
   static chooseMimeType(): string {
@@ -28,7 +30,7 @@ export class MicrophoneRecorder {
     return choices.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
   }
 
-  async prepare(): Promise<void> {
+  async prepare(deviceId = ""): Promise<void> {
     if (!window.isSecureContext) {
       throw new Error("Microphone access requires HTTPS. When using Tailscale, run “make tailscale” and open the https://…ts.net address it displays.");
     }
@@ -38,11 +40,18 @@ export class MicrophoneRecorder {
     if (!window.MediaRecorder) {
       throw new Error("MediaRecorder is not supported by this Safari version. Update iOS and try again.");
     }
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      // Keep noise suppression and automatic gain while avoiding the echo-
-      // cancellation path that may trigger iOS playback ducking.
-      audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true },
-    });
+    // Keep noise suppression and automatic gain while avoiding the echo-
+    // cancellation path that may trigger iOS playback ducking.
+    const audio: MediaTrackConstraints = {
+      echoCancellation: false,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+    if (deviceId) audio.deviceId = { exact: deviceId };
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio });
+    const track = this.stream.getAudioTracks()[0];
+    this.deviceId = track?.getSettings().deviceId ?? deviceId;
+    this.deviceLabel = track?.label ?? "";
     const type = MicrophoneRecorder.chooseMimeType();
     this.recorder = new MediaRecorder(this.stream, type ? { mimeType: type } : undefined);
     this.mimeType = this.recorder.mimeType || type || "application/octet-stream";
