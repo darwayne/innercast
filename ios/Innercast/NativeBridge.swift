@@ -12,11 +12,15 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply, WKNavigatio
 
     private let audio: NativeAudioPipeline
     private let repository: NativeSessionRepository
+    private let transcription: NativeTranscriptionService
     private var pickerReply: ((Any?, String?) -> Void)?
 
-    init(audio: NativeAudioPipeline, repository: NativeSessionRepository) {
+    init(audio: NativeAudioPipeline, repository: NativeSessionRepository, transcription: NativeTranscriptionService) {
         self.audio = audio
         self.repository = repository
+        self.transcription = transcription
+        super.init()
+        transcription.eventHandler = { [weak self] event in self?.send(event: event) }
     }
 
     func userContentController(
@@ -41,7 +45,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply, WKNavigatio
                 "bridgeVersion": 1,
                 "nativeAudio": true,
                 "nativeSessions": true,
-                "transcription": false
+                "transcription": transcription.isAvailable,
+                "transcriptionProvider": transcription.isAvailable ? "apple-speech-analyzer" : "none"
             ], nil)
         case "selectSource":
             presentSourcePicker(replyHandler: replyHandler)
@@ -89,6 +94,18 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply, WKNavigatio
             replyHandler(["presented": true], nil)
         case "storageInfo":
             replyHandler(repository.storageInfo(), nil)
+        case "startTranscription":
+            guard let id = payload["id"] as? String, !id.isEmpty else {
+                replyHandler(nil, "The recording ID is missing.")
+                return
+            }
+            reply({
+                try transcription.start(sessionID: id)
+                return ["started": true]
+            }, using: replyHandler)
+        case "cancelTranscription":
+            transcription.cancel(sessionID: payload["id"] as? String)
+            replyHandler(["cancelled": true], nil)
         case "diagnostics":
             replyHandler(audio.diagnostics(), nil)
         default:

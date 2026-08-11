@@ -91,6 +91,7 @@ final class InnercastAppModel: ObservableObject {
 
     let repository: NativeSessionRepository
     let audio: NativeAudioPipeline
+    let transcription: NativeTranscriptionService
     let bridge: NativeBridge
     private let server: LoopbackServer
 
@@ -99,7 +100,9 @@ final class InnercastAppModel: ObservableObject {
         self.repository = repository
         let audio = NativeAudioPipeline(repository: repository)
         self.audio = audio
-        self.bridge = NativeBridge(audio: audio, repository: repository)
+        let transcription = NativeTranscriptionService(repository: repository)
+        self.transcription = transcription
+        self.bridge = NativeBridge(audio: audio, repository: repository, transcription: transcription)
         self.server = LoopbackServer(repository: repository, audio: audio)
         audio.eventHandler = { [weak bridge] event in bridge?.send(event: event) }
         bridge.pageReadyHandler = { [weak self] in

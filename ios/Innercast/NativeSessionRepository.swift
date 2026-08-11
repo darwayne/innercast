@@ -21,15 +21,57 @@ struct NativeSynchronizationMetadata: Codable, Sendable {
     let configuredValueSeconds: Double
 }
 
+struct NativeTranscriptSegment: Codable, Sendable {
+    let text: String
+    let micTimestampSeconds: Double
+    let sourceTimestampSeconds: Double
+    let endMicTimestampSeconds: Double?
+}
+
+struct NativeTranscriptionMetadata: Codable, Sendable {
+    let text: String
+    let language: String
+    let provider: String
+    let model: String
+    let modelId: String
+    let device: String
+    let createdAt: String
+    let segments: [NativeTranscriptSegment]
+    let errorMessage: String?
+
+    func dictionary() -> [String: Any] {
+        [
+            "text": text,
+            "language": language,
+            "provider": provider,
+            "model": model,
+            "modelId": modelId,
+            "device": device,
+            "createdAt": createdAt,
+            "segments": segments.map { segment in
+                var result: [String: Any] = [
+                    "text": segment.text,
+                    "micTimestampSeconds": segment.micTimestampSeconds,
+                    "sourceTimestampSeconds": segment.sourceTimestampSeconds
+                ]
+                if let end = segment.endMicTimestampSeconds { result["endMicTimestampSeconds"] = end }
+                return result
+            },
+            "errorMessage": errorMessage ?? ""
+        ]
+    }
+}
+
 struct NativeSession: Codable, Sendable {
     let id: String
     let createdAt: String
     let source: NativeSourceMetadata
     let recording: NativeRecordingMetadata
     let synchronization: NativeSynchronizationMetadata
+    let transcription: NativeTranscriptionMetadata?
 
     func dictionary() -> [String: Any] {
-        [
+        var result: [String: Any] = [
             "id": id,
             "createdAt": createdAt,
             "source": [
@@ -51,6 +93,8 @@ struct NativeSession: Codable, Sendable {
                 "configuredValueSeconds": synchronization.configuredValueSeconds
             ]
         ]
+        if let transcription { result["transcription"] = transcription.dictionary() }
+        return result
     }
 }
 
@@ -106,7 +150,8 @@ final class NativeSessionRepository: @unchecked Sendable {
                 durationSeconds: durationSeconds,
                 channelCount: channelCount
             ),
-            synchronization: synchronization
+            synchronization: synchronization,
+            transcription: nil
         )
         let data = try JSONEncoder().encode(session)
         try data.write(to: directory.appendingPathComponent("metadata.json"), options: .atomic)
@@ -140,6 +185,25 @@ final class NativeSessionRepository: @unchecked Sendable {
         defer { lock.unlock() }
         let directory = root.appendingPathComponent(id, isDirectory: true)
         if fileManager.fileExists(atPath: directory.path) { try fileManager.removeItem(at: directory) }
+    }
+
+    @discardableResult
+    func updateTranscription(id: String, transcription: NativeTranscriptionMetadata) throws -> NativeSession {
+        lock.lock()
+        defer { lock.unlock() }
+        let metadataURL = root.appendingPathComponent(id, isDirectory: true).appendingPathComponent("metadata.json")
+        let data = try Data(contentsOf: metadataURL)
+        let existing = try JSONDecoder().decode(NativeSession.self, from: data)
+        let updated = NativeSession(
+            id: existing.id,
+            createdAt: existing.createdAt,
+            source: existing.source,
+            recording: existing.recording,
+            synchronization: existing.synchronization,
+            transcription: transcription
+        )
+        try JSONEncoder().encode(updated).write(to: metadataURL, options: .atomic)
+        return updated
     }
 
     func storageInfo() -> [String: Any] {

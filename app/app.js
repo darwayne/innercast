@@ -4,7 +4,7 @@ import { MicrophoneRecorder, SynchronizationController } from "./controllers.js?
 import { isLikelyAudioFile } from "./file-types.js";
 import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=19";
 import { ChunkedModelCache } from "./model-cache.js?v=19";
-import { isNativeRuntime, nativeCommand, NativeRecordingRepository } from "./native-runtime.js?v=1";
+import { isNativeRuntime, nativeCommand, NativeOnDeviceTranscriber, NativeRecordingRepository } from "./native-runtime.js?v=2";
 
 const $ = (selector) => document.querySelector(selector);
 const repository = isNativeRuntime ? new NativeRecordingRepository() : new RecordingRepository();
@@ -34,6 +34,7 @@ const state = {
   settingsReturnView: "sessions",
   nativePaused: false,
   nativeFinalizedSessionId: null,
+  nativeCapabilities: null,
 };
 
 const elements = {
@@ -152,6 +153,19 @@ function selectedTranscriptionModel() {
 
 function transcriptionModelLabel(modelKey = selectedTranscriptionModel()) {
   return WHISPER_MODELS[modelKey]?.label.split(" —")[0] || "Whisper Small English";
+}
+
+function transcriptionStatusMarkup() {
+  return isNativeRuntime
+    ? "Uses Apple Speech · processed privately on this device."
+    : `Uses ${transcriptionModelLabel()}. <a href="#/settings" data-settings-from="sessions">Change in Settings</a>.`;
+}
+
+async function ensureNativeCapabilities() {
+  if (!isNativeRuntime || state.nativeCapabilities) return state.nativeCapabilities;
+  try { state.nativeCapabilities = await nativeCommand("capabilities"); }
+  catch { state.nativeCapabilities = { transcription: false }; }
+  return state.nativeCapabilities;
 }
 
 function updateTranscriptionSettingDescription() {
@@ -735,6 +749,23 @@ function clearSessionObjectUrls() {
   state.sessionObjectUrls = [];
 }
 
+async function copyTranscript(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+  const copied = document.execCommand("copy");
+  field.remove();
+  if (!copied) throw new Error("Clipboard access is unavailable.");
+}
+
 function renderSavedTranscript(article, session) {
   if (!article) return;
   article.querySelector(".transcript-fact")?.remove();
@@ -752,13 +783,30 @@ function renderSavedTranscript(article, session) {
   details.className = "saved-transcript";
   const summary = document.createElement("summary");
   const modelChoice = WHISPER_MODELS[session.transcription.model];
-  const modelLabel = modelChoice
+  const modelLabel = session.transcription.provider === "apple-speech-analyzer"
+    ? " · Apple Speech"
+    : modelChoice
     ? ` · ${modelChoice.label.split(" —")[0]}`
     : session.transcription.model ? ` · ${session.transcription.model}` : "";
   summary.textContent = `Transcript · ${session.transcription.language || "Unknown language"}${modelLabel}`;
   const transcript = document.createElement("p");
   transcript.textContent = session.transcription.text || session.transcription.errorMessage || "No speech was recognized.";
   details.append(summary, transcript);
+  if (session.transcription.text?.trim()) {
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "copy-transcript";
+    copy.textContent = "Copy transcript";
+    copy.addEventListener("click", async () => {
+      try {
+        await copyTranscript(session.transcription.text);
+        showToast("Transcript copied to the clipboard.");
+      } catch (error) {
+        showToast(`Could not copy the transcript: ${error.message || error}`, true);
+      }
+    });
+    details.append(copy);
+  }
   article.querySelector("audio").after(details);
 }
 
@@ -776,33 +824,37 @@ async function transcribeSavedSession(session, panel) {
     return;
   }
 
-  const transcriber = new OnDeviceWhisperTranscriber();
+  const transcriber = isNativeRuntime ? new NativeOnDeviceTranscriber() : new OnDeviceWhisperTranscriber();
   state.transcriptionJob = { sessionId: session.id, transcriber };
   button.textContent = "Cancel";
   button.classList.add("cancel-transcription");
   status.textContent = "Preparing saved recording… Keep this page open.";
   let savedTranscription = null;
   try {
-    // Fetch a new structured clone of the Blob for every attempt. WebKit can
-    // invalidate an older IndexedDB Blob handle after the same record is
-    // rewritten to save its previous transcript. Reusing the session-card
-    // object then makes decodeAudioData fail with "The object can not be found
-    // here" when the user switches models and transcribes again.
-    const storedSession = await repository.getSession(session.id);
-    if (!storedSession?.recording?.blob?.size) {
-      throw new Error("The saved recording could not be reopened from this device.");
+    const onProgress = (update) => {
+      status.textContent = update.message || "Transcribing on this device…";
+      progress.classList.toggle("hidden", !Number.isFinite(update.progress));
+      if (Number.isFinite(update.progress)) progress.value = Math.max(0, Math.min(1, update.progress));
+    };
+    let transcription;
+    if (isNativeRuntime) {
+      transcription = await transcriber.transcribe(session.id, onProgress);
+    } else {
+      // Fetch a new structured clone of the Blob for every attempt. WebKit can
+      // invalidate an older IndexedDB Blob handle after the same record is
+      // rewritten to save its previous transcript.
+      const storedSession = await repository.getSession(session.id);
+      if (!storedSession?.recording?.blob?.size) {
+        throw new Error("The saved recording could not be reopened from this device.");
+      }
+      transcription = await transcriber.transcribe(
+        storedSession.recording.blob,
+        selectedTranscriptionModel(),
+        session.synchronization.recordingSourceOffsetSeconds,
+        onProgress,
+      );
+      await repository.updateSessionTranscription(session.id, transcription);
     }
-    const transcription = await transcriber.transcribe(
-      storedSession.recording.blob,
-      selectedTranscriptionModel(),
-      session.synchronization.recordingSourceOffsetSeconds,
-      (update) => {
-        status.textContent = update.message || "Transcribing on this device…";
-        progress.classList.toggle("hidden", !Number.isFinite(update.progress));
-        if (Number.isFinite(update.progress)) progress.value = Math.max(0, Math.min(1, update.progress));
-      },
-    );
-    await repository.updateSessionTranscription(session.id, transcription);
     session.transcription = transcription;
     savedTranscription = transcription;
     showToast("On-device transcript saved with this recording.");
@@ -815,7 +867,7 @@ async function transcribeSavedSession(session, panel) {
     button.classList.remove("cancel-transcription");
     button.textContent = savedTranscription || session.transcription ? "Transcribe again" : "Transcribe";
     progress.classList.add("hidden");
-    status.innerHTML = `Uses ${transcriptionModelLabel()}. <a href="#/settings" data-settings-from="sessions">Change in Settings</a>.`;
+    status.innerHTML = transcriptionStatusMarkup();
     if (savedTranscription) {
       if (panel.isConnected) renderSavedTranscript(panel.closest(".session-card"), session);
       else if (viewFromRoute() === "sessions") await loadSessions();
@@ -831,7 +883,7 @@ function createTranscriptionPanel(session) {
     <div><strong>On-device transcription</strong><span>Runs after recording so it cannot interrupt microphone capture.</span></div>
     <div class="transcription-controls single"><button type="button"></button></div>
     <progress class="hidden" max="1" value="0"></progress>
-    <small>Uses ${transcriptionModelLabel()}. <a href="#/settings" data-settings-from="sessions">Change in Settings</a>.</small>`;
+    <small>${transcriptionStatusMarkup()}</small>`;
   const button = panel.querySelector("button");
   button.textContent = session.transcription ? "Transcribe again" : "Transcribe";
   button.addEventListener("click", () => transcribeSavedSession(session, panel));
@@ -840,6 +892,7 @@ function createTranscriptionPanel(session) {
 
 async function loadSessions() {
   try {
+    await ensureNativeCapabilities();
     const sessions = await repository.listSessions();
     // Detach media elements before revoking their Blob URLs. Revoking a URL
     // while a mobile browser still has it attached can poison the replacement
@@ -878,7 +931,7 @@ async function loadSessions() {
       recordingAudio.addEventListener("touchstart", preparePlaybackOutput, { passive: true });
       recordingAudio.addEventListener("play", resetBrowserAudioSessionForPlayback);
       renderSavedTranscript(article, session);
-      if (!isNativeRuntime) {
+      if (!isNativeRuntime || state.nativeCapabilities?.transcription) {
         const transcriptionPanel = createTranscriptionPanel(session);
         article.querySelector(".session-buttons").before(transcriptionPanel);
       }

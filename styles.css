@@ -127,6 +127,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .session-buttons { display: flex; gap: 8px; margin-top: 12px; }.session-buttons button, .session-buttons a { flex: 1; display: grid; place-items: center; min-height: 42px; border-radius: 10px; border: 1px solid var(--line); background: white; color: var(--ink); text-decoration: none; cursor: pointer; font-size: 13px; font-weight: 700; }.session-buttons .delete-button { color: #9e3827; }
 .saved-transcript { margin: 15px 0 0; padding: 14px; border-left: 3px solid var(--accent); border-radius: 0 9px 9px 0; background: #faf5ee; }
 .saved-transcript summary { cursor: pointer; font-size: 13px; font-weight: 750; }.saved-transcript p { margin: 11px 0 0; color: #485550; white-space: pre-wrap; line-height: 1.55; font-size: 13px; }
+.copy-transcript { margin-top: 12px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--green); font-size: 12px; font-weight: 750; cursor: pointer; }
 .transcription-panel { margin-top: 15px; padding: 14px; border-radius: 12px; background: var(--pale-green); }
 .transcription-panel > div:first-child strong, .transcription-panel > div:first-child span { display: block; }
 .transcription-panel > div:first-child strong { font-size: 13px; }

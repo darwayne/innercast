@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Innercast records your microphone while playing your selected audio.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Innercast transcribes your saved recordings privately on this device.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

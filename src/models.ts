@@ -34,10 +34,10 @@ export interface SavedSession {
     text: string;
     language: string;
     /** web-speech-api is retained only so sessions saved by older builds remain readable. */
-    provider: "whisper-transformers-js" | "moonshine-transformers-js" | "moonshine-v2-onnxruntime-web" | "web-speech-api";
-    model?: "tiny" | "base" | "small" | "medium" | "moonshineTiny" | "moonshineBase" | "moonshineSmallStreaming" | "moonshineMediumStreaming";
+    provider: "whisper-transformers-js" | "moonshine-transformers-js" | "moonshine-v2-onnxruntime-web" | "apple-speech-analyzer" | "web-speech-api";
+    model?: "tiny" | "base" | "small" | "medium" | "moonshineTiny" | "moonshineBase" | "moonshineSmallStreaming" | "moonshineMediumStreaming" | "appleSpeech";
     modelId?: string;
-    device?: "wasm" | "webgpu";
+    device?: "wasm" | "webgpu" | "apple-on-device";
     createdAt?: string;
     segments: Array<{
       text: string;

@@ -22,6 +22,7 @@
 		100000000000000000000013 /* service-worker.js in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000015 /* service-worker.js */; };
 		100000000000000000000014 /* app in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000016 /* app */; };
 		100000000000000000000015 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000017 /* assets */; };
+		100000000000000000000016 /* NativeTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000020 /* NativeTranscriptionService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +45,7 @@
 		200000000000000000000017 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../assets; sourceTree = SOURCE_ROOT; };
 		200000000000000000000018 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		200000000000000000000019 /* Signing.local.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.local.example.xcconfig; sourceTree = "<group>"; };
+		200000000000000000000020 /* NativeTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTranscriptionService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +80,7 @@
 				200000000000000000000009 /* NativeBridge.swift */,
 				200000000000000000000010 /* NativeAudioPipeline.swift */,
 				200000000000000000000011 /* NativeSessionRepository.swift */,
+				200000000000000000000020 /* NativeTranscriptionService.swift */,
 				200000000000000000000005 /* Assets.xcassets */,
 				200000000000000000000006 /* Info.plist */,
 			);
@@ -197,6 +200,7 @@
 				100000000000000000000007 /* NativeBridge.swift in Sources */,
 				100000000000000000000008 /* NativeAudioPipeline.swift in Sources */,
 				100000000000000000000009 /* NativeSessionRepository.swift in Sources */,
+				100000000000000000000016 /* NativeTranscriptionService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
