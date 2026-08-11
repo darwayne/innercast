@@ -43,7 +43,7 @@
           <input id="audio-file" type="file" accept="audio/*,.aac,.m4a,.mp4,.mp3,.flac,.wav,.wave,.aif,.aiff,.caf" hidden />
           <label id="file-picker" class="file-picker" for="audio-file">
             <span class="file-icon" aria-hidden="true">♫</span>
-            <span><strong>Choose an audio file</strong><small>AAC, M4A, MP3, FLAC, WAV, AIFF, CAF, or any format Safari can play</small></span>
+            <span><strong>Choose an audio file</strong><small>AAC, M4A, MP3, FLAC, WAV, AIFF, CAF, or any format your browser can play</small></span>
             <span class="pick-action">Browse</span>
           </label>
           <div id="source-details" class="source-details hidden">
@@ -60,37 +60,6 @@
                 <div class="time-row"><span id="current-time">00:00</span><span id="duration">00:00</span></div>
               </div>
             </div>
-            <details class="routing-lab">
-              <summary>Test iOS audio routing</summary>
-              <p>Play the preview above, then activate a microphone to compare Safari audio-session combinations. Test audio is not recorded or saved.</p>
-              <div class="routing-lab-grid">
-                <label>Before microphone
-                  <select id="routing-before">
-                    <option value="auto">Auto</option>
-                    <option value="playback">Playback</option>
-                    <option value="play-and-record" selected>Play and record</option>
-                  </select>
-                </label>
-                <label>After microphone
-                  <select id="routing-after">
-                    <option value="">Keep current profile</option>
-                    <option value="auto">Auto</option>
-                    <option value="playback" selected>Playback</option>
-                    <option value="play-and-record">Play and record</option>
-                  </select>
-                </label>
-              </div>
-              <label class="routing-output-field">Playback output
-                <select id="routing-output">
-                  <option value="">System default</option>
-                  <option value="id-multimedia">Multimedia route (experimental)</option>
-                  <option value="id-communications">Communications route</option>
-                </select>
-              </label>
-              <button id="routing-output-apply" class="secondary-button settings-action" type="button">Apply playback output</button>
-              <button id="routing-test-toggle" class="secondary-button settings-action" type="button">Activate microphone test</button>
-              <p id="routing-test-status" class="routing-test-status">Microphone inactive · stereo playback baseline</p>
-            </details>
           </div>
         </section>
 
@@ -169,15 +138,15 @@
         <section class="card settings-card" aria-labelledby="microphone-settings-title">
           <div class="step-heading">
             <span class="step-number">MIC</span>
-            <div><h2 id="microphone-settings-title">Recording microphone</h2><p>Choose which available input Innercast asks Safari to use.</p></div>
+            <div><h2 id="microphone-settings-title">Recording microphone</h2><p>Choose which available input Innercast asks your browser to use.</p></div>
           </div>
           <label class="settings-field" for="microphone-setting">
             <span>Input device</span>
-            <select id="microphone-setting"><option value="">Automatic (Safari default)</option></select>
+            <select id="microphone-setting"><option value="">Automatic (browser default)</option></select>
           </label>
-          <p id="microphone-setting-description" class="settings-description">Safari may require microphone permission before it reveals available input names.</p>
+          <p id="microphone-setting-description" class="settings-description">Your browser may require microphone permission before it reveals available input names.</p>
           <button id="refresh-microphones" class="secondary-button settings-action" type="button">Find microphones</button>
-          <p class="settings-description">For Bluetooth headphones, choosing the iPhone microphone may preserve stereo headphone playback. Safari and iOS ultimately control audio routing and may not expose every connected microphone.</p>
+          <p class="settings-description">For Bluetooth headphones, choosing the device microphone may preserve stereo headphone playback. The browser and operating system ultimately control audio routing and may not expose every connected microphone.</p>
         </section>
         <section class="card settings-card" aria-labelledby="transcription-settings-title">
           <div class="step-heading">
@@ -195,6 +164,6 @@
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app/app.js?v=25"></script>
+    <script type="module" src="app/app.js?v=26"></script>
   </body>
 </html>

@@ -22,8 +22,8 @@ export class MicrophoneRecorder {
 
   async prepare(deviceId = "") {
     if (!window.isSecureContext) throw new Error("Microphone access requires HTTPS. When using Tailscale, run “make tailscale” and open the https://…ts.net address it displays.");
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not expose microphone access. Open Innercast directly in Safari and check the site's microphone permission.");
-    if (!window.MediaRecorder) throw new Error("MediaRecorder is not supported by this Safari version. Update iOS and try again.");
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not expose microphone access. Open Innercast over HTTPS and check the site's microphone permission.");
+    if (!window.MediaRecorder) throw new Error("MediaRecorder is not supported by this browser. Update your browser or operating system and try again.");
     // Keep noise suppression and automatic gain enabled while avoiding the
     // echo-cancellation path that may trigger iOS playback ducking.
     const audio = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };

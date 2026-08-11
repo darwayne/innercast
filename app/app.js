@@ -1,9 +1,9 @@
 import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js";
 import { RecordingRepository } from "./repository.js";
-import { MicrophoneRecorder, SynchronizationController } from "./controllers.js?v=20";
+import { MicrophoneRecorder, SynchronizationController } from "./controllers.js?v=21";
 import { isLikelyAudioFile } from "./file-types.js";
-import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=18";
-import { ChunkedModelCache } from "./model-cache.js?v=18";
+import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=19";
+import { ChunkedModelCache } from "./model-cache.js?v=19";
 import { isNativeRuntime, nativeCommand, NativeRecordingRepository } from "./native-runtime.js?v=1";
 
 const $ = (selector) => document.querySelector(selector);
@@ -31,10 +31,7 @@ const state = {
   transcriptionJob: null,
   wakeLock: null,
   microphoneDevices: [],
-  audioOutputDevices: [],
   settingsReturnView: "sessions",
-  routingTestStream: null,
-  routingTestDeviceLabel: "",
   nativePaused: false,
   nativeFinalizedSessionId: null,
 };
@@ -58,16 +55,13 @@ const elements = {
   refreshMicrophones: $("#refresh-microphones"),
   selectedMicrophoneLabel: $("#selected-microphone-label"),
   settingsBack: $("#settings-back"),
-  routingBefore: $("#routing-before"), routingAfter: $("#routing-after"),
-  routingTestToggle: $("#routing-test-toggle"), routingTestStatus: $("#routing-test-status"),
-  routingOutput: $("#routing-output"), routingOutputApply: $("#routing-output-apply"),
 };
 
 function selectedMicrophonePreference() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(MICROPHONE_SETTING) || "null");
     if (saved?.deviceId) return { deviceId: saved.deviceId, label: saved.label || "Selected microphone" };
-  } catch { /* Fall back to Safari's default input. */ }
+  } catch { /* Fall back to the browser's default input. */ }
   return { deviceId: "", label: "Automatic" };
 }
 
@@ -75,7 +69,7 @@ function saveMicrophonePreference(deviceId, label) {
   try {
     if (deviceId) window.localStorage.setItem(MICROPHONE_SETTING, JSON.stringify({ deviceId, label }));
     else window.localStorage.removeItem(MICROPHONE_SETTING);
-  } catch { showToast("Safari could not save the microphone setting.", true); }
+  } catch { showToast("The browser could not save the microphone setting.", true); }
 }
 
 function updateMicrophoneContext() {
@@ -88,7 +82,7 @@ function renderMicrophoneSettings() {
   elements.microphoneSetting.replaceChildren();
   const automatic = document.createElement("option");
   automatic.value = "";
-  automatic.textContent = "Automatic (Safari default)";
+  automatic.textContent = "Automatic (browser default)";
   elements.microphoneSetting.append(automatic);
   state.microphoneDevices.forEach((device, index) => {
     const option = document.createElement("option");
@@ -105,44 +99,19 @@ function renderMicrophoneSettings() {
   elements.microphoneSetting.value = preference.deviceId;
   const count = state.microphoneDevices.length;
   elements.microphoneSettingDescription.textContent = !navigator.mediaDevices?.enumerateDevices
-    ? "This browser does not support microphone enumeration. Safari will choose the input automatically."
+    ? "This browser does not support microphone enumeration and will choose the input automatically."
     : count === 0
-      ? "Safari has not revealed any named inputs yet. Tap Find microphones and allow access to refresh the list."
+      ? "The browser has not revealed any named inputs yet. Tap Find microphones and allow access to refresh the list."
       : count === 1
-        ? "Safari currently exposes one microphone to this web app."
+        ? "The browser currently exposes one microphone to this web app."
         : `${count} microphones are available. The selected input will be requested when a session starts.`;
   updateMicrophoneContext();
-}
-
-function renderRoutingOutputs() {
-  if (!elements.routingOutput) return;
-  const selected = elements.routingOutput.value;
-  const choices = [
-    ["", "System default"],
-    ["id-multimedia", "Multimedia route (experimental)"],
-    ["id-communications", "Communications route"],
-  ];
-  state.audioOutputDevices.forEach((device, index) => {
-    if (!choices.some(([id]) => id === device.deviceId)) {
-      choices.push([device.deviceId, device.label || `Audio output ${index + 1}`]);
-    }
-  });
-  elements.routingOutput.replaceChildren();
-  choices.forEach(([value, label]) => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    elements.routingOutput.append(option);
-  });
-  elements.routingOutput.value = choices.some(([value]) => value === selected) ? selected : "";
 }
 
 async function refreshMicrophoneDevices(requestPermission = false) {
   if (!navigator.mediaDevices?.enumerateDevices) {
     state.microphoneDevices = [];
-    state.audioOutputDevices = [];
     renderMicrophoneSettings();
-    renderRoutingOutputs();
     return;
   }
   let permissionStream = null;
@@ -158,13 +127,11 @@ async function refreshMicrophoneDevices(requestPermission = false) {
       seen.add(device.deviceId);
       return true;
     });
-    state.audioOutputDevices = devices.filter((device) => device.kind === "audiooutput" && device.deviceId);
     renderMicrophoneSettings();
-    renderRoutingOutputs();
   } catch (error) {
     if (requestPermission) {
       const denied = error?.name === "NotAllowedError";
-      showToast(denied ? "Microphone access was not allowed, so Safari cannot reveal input names." : `Could not refresh microphones: ${error.message}`, true);
+      showToast(denied ? "Microphone access was not allowed, so the browser cannot reveal input names." : `Could not refresh microphones: ${error.message}`, true);
     }
   } finally {
     permissionStream?.getTracks().forEach((track) => track.stop());
@@ -173,90 +140,7 @@ async function refreshMicrophoneDevices(requestPermission = false) {
 }
 
 function microphoneLabelForId(deviceId) {
-  return state.microphoneDevices.find((device) => device.deviceId === deviceId)?.label || "Safari default";
-}
-
-function browserAudioSessionLabel() {
-  try { return navigator.audioSession?.type || "unavailable"; }
-  catch { return "unavailable"; }
-}
-
-function updateRoutingTestStatus() {
-  const sink = typeof elements.audio.setSinkId === "function" ? (elements.audio.sinkId || "system default") : "setSinkId unavailable";
-  if (!state.routingTestStream) {
-    elements.routingTestStatus.textContent = `Microphone inactive · audio session ${browserAudioSessionLabel()} · output ${sink}`;
-    return;
-  }
-  const track = state.routingTestStream.getAudioTracks()[0];
-  const trackState = track?.readyState || "ended";
-  elements.routingTestStatus.textContent = `Mic active: ${state.routingTestDeviceLabel || "Safari default"} · track ${trackState} · audio session ${browserAudioSessionLabel()} · output ${sink}`;
-}
-
-async function applyRoutingOutput() {
-  if (typeof elements.audio.setSinkId !== "function") {
-    showToast("This Safari build does not expose playback-output selection.", true);
-    updateRoutingTestStatus();
-    return;
-  }
-  elements.routingOutputApply.disabled = true;
-  try {
-    await elements.audio.setSinkId(elements.routingOutput.value);
-    updateRoutingTestStatus();
-    showToast(`Playback output accepted: ${elements.routingOutput.selectedOptions[0].textContent}.`);
-  } catch (error) {
-    updateRoutingTestStatus();
-    showToast(`Safari rejected that playback output: ${error.name || "Error"} — ${error.message || error}`, true);
-  } finally {
-    elements.routingOutputApply.disabled = false;
-  }
-}
-
-function stopRoutingTest(resetAudioSession = true) {
-  const stream = state.routingTestStream;
-  state.routingTestStream = null;
-  state.routingTestDeviceLabel = "";
-  stream?.getTracks().forEach((track) => track.stop());
-  elements.routingTestToggle.textContent = "Activate microphone test";
-  elements.routingTestToggle.disabled = false;
-  elements.routingBefore.disabled = false;
-  if (resetAudioSession) resetBrowserAudioSessionForPlayback();
-  updateRoutingTestStatus();
-}
-
-async function toggleRoutingTest() {
-  if (state.routingTestStream) {
-    stopRoutingTest();
-    return;
-  }
-  elements.routingTestToggle.disabled = true;
-  elements.routingTestToggle.textContent = "Opening microphone…";
-  try {
-    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      throw new Error("Microphone route testing requires HTTPS and Safari microphone access.");
-    }
-    const preference = selectedMicrophonePreference();
-    const audio = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
-    if (preference.deviceId) audio.deviceId = { exact: preference.deviceId };
-    setBrowserAudioSession(elements.routingBefore.value);
-    const stream = await navigator.mediaDevices.getUserMedia({ audio });
-    state.routingTestStream = stream;
-    elements.routingBefore.disabled = true;
-    const track = stream.getAudioTracks()[0];
-    state.routingTestDeviceLabel = track?.label || preference.label;
-    if (elements.routingAfter.value) setBrowserAudioSession(elements.routingAfter.value);
-    if (track) {
-      track.onended = () => {
-        if (state.routingTestStream === stream) stopRoutingTest();
-      };
-    }
-    await refreshMicrophoneDevices();
-    elements.routingTestToggle.disabled = false;
-    elements.routingTestToggle.textContent = "Stop microphone test";
-    updateRoutingTestStatus();
-  } catch (error) {
-    stopRoutingTest();
-    showToast(`Could not activate the microphone test: ${error.message || error}`, true);
-  }
+  return state.microphoneDevices.find((device) => device.deviceId === deviceId)?.label || "Browser default";
 }
 
 function selectedTranscriptionModel() {
@@ -288,7 +172,7 @@ function initializeTranscriptionSettings() {
   updateTranscriptionSettingDescription();
   elements.transcriptionModelSetting.addEventListener("change", () => {
     try { window.localStorage.setItem(TRANSCRIPTION_MODEL_SETTING, elements.transcriptionModelSetting.value); }
-    catch { showToast("Safari could not save this setting.", true); }
+    catch { showToast("The browser could not save this setting.", true); }
     updateTranscriptionSettingDescription();
     showToast(`${transcriptionModelLabel()} will be used for transcription.`);
   });
@@ -302,7 +186,7 @@ function showToast(message, error = false) {
 }
 
 function setBrowserAudioSession(type) {
-  // Safari exposes the Audio Session API on current iOS releases. Explicitly
+  // WebKit exposes the Audio Session API on current iOS releases. Explicitly
   // selecting playback prevents IndexedDB Blob players from remaining silent
   // until another native media element happens to initialize the output route.
   try {
@@ -321,13 +205,13 @@ function resetBrowserAudioSessionForPlayback() {
       navigator.audioSession.type = "playback";
       navigator.audioSession.type = "auto";
     }
-  } catch { /* The Audio Session API is Safari-specific and optional. */ }
+  } catch { /* The Audio Session API is browser-specific and optional. */ }
 }
 
 function preparePlaybackOutput() {
   resetBrowserAudioSessionForPlayback();
   // Resume during the user's touch gesture when possible. The HTMLAudioElement
-  // remains the actual output path; this only unlocks Safari's audio machinery.
+  // remains the actual output path; this only unlocks the browser's audio machinery.
   ensureAudioContext().catch(() => {});
 }
 
@@ -346,7 +230,7 @@ async function requestSessionWakeLock() {
     });
   } catch (error) {
     // Wake Lock is an optional safeguard. Recording must remain usable when
-    // Safari declines it (for example, in Low Power Mode).
+    // The browser declines it (for example, in Low Power Mode).
     console.warn("The screen wake lock could not be acquired.", error);
   }
 }
@@ -367,7 +251,7 @@ async function registerOfflineSupport() {
     await navigator.serviceWorker.ready;
     if (!hadController) showToast("Innercast is ready for offline use.");
   } catch (error) {
-    // Recording and storage remain usable even if Safari declines service
+    // Recording and storage remain usable even if the browser declines service
     // worker registration (for example, in private browsing mode).
     console.warn("Offline support could not be installed.", error);
   }
@@ -441,17 +325,11 @@ function setConfigurationLocked(locked) {
   elements.changeFile.disabled = locked;
   elements.seek.disabled = locked;
   elements.previewToggle.disabled = locked;
-  elements.routingBefore.disabled = locked;
-  elements.routingAfter.disabled = locked;
-  elements.routingTestToggle.disabled = locked;
-  elements.routingOutput.disabled = locked;
-  elements.routingOutputApply.disabled = locked;
   updateModeUI();
 }
 
 function resetSelectedFile() {
   if (state.sessionActive) return;
-  stopRoutingTest();
   elements.audio.pause();
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   state.file = null; state.objectUrl = null; state.duration = 0;
@@ -605,7 +483,6 @@ async function startSession() {
     showToast("Finish or cancel the on-device transcription before starting a recording.", true);
     return;
   }
-  stopRoutingTest(false);
   elements.startButton.disabled = true;
   elements.startButton.querySelector("span").textContent = "Preparing microphone…";
   if (isNativeRuntime) {
@@ -674,7 +551,7 @@ async function startSession() {
     elements.waitingMessage.querySelector("strong").textContent = formatTimestamp(offset);
     elements.pauseButton.textContent = "Pause";
     await elements.audio.play();
-    if (elements.audio.paused) throw new Error("Safari did not start source playback. Tap Start session again and confirm that audio is routed to your headphones.");
+    if (elements.audio.paused) throw new Error("The browser did not start source playback. Tap Start session again and confirm that audio is routed to your headphones.");
     if (mode === "immediate") await beginMicrophoneRecording();
     cancelAnimationFrame(state.animationFrame);
     state.animationFrame = requestAnimationFrame(renderActiveSession);
@@ -687,7 +564,7 @@ async function startSession() {
     setConfigurationLocked(false);
     elements.activeSession.classList.add("hidden");
     const message = error?.name === "NotAllowedError"
-      ? "Microphone access was denied. Allow microphone access in Safari settings and try again."
+      ? "Microphone access was denied. Allow microphone access in your browser or site settings and try again."
       : ["OverconstrainedError", "NotFoundError"].includes(error?.name)
         ? "The selected microphone is no longer available. Reconnect it or choose another microphone in Settings."
         : `Could not start the session: ${error.message || error}`;
@@ -781,7 +658,7 @@ async function stopSession(reason = "manual") {
     } else if (!hadRecording) {
       showToast("Session stopped before the recording start point, so nothing was saved.");
     } else {
-      showToast("Recording started but Safari did not provide any audio data to save.", true);
+      showToast("Recording started but the browser did not provide any audio data to save.", true);
     }
   } catch (error) {
     showToast(`The recording could not be finalized: ${error.message}`, true);
@@ -951,7 +828,7 @@ async function loadSessions() {
   try {
     const sessions = await repository.listSessions();
     // Detach media elements before revoking their Blob URLs. Revoking a URL
-    // while Mobile Safari still has it attached can poison the replacement
+    // while a mobile browser still has it attached can poison the replacement
     // player with a MEDIA_ERR_SRC_NOT_SUPPORTED state.
     elements.sessionsList.querySelectorAll("audio").forEach((audio) => {
       audio.pause();
@@ -1050,7 +927,6 @@ function switchView(view, updateRoute = true) {
     showToast("Stop the active session before leaving the recorder.", true);
     return;
   }
-  if (view !== "recorder" && state.routingTestStream) stopRoutingTest();
   if (updateRoute && window.location.hash !== routeForView(view)) {
     window.location.hash = routeForView(view);
     return;
@@ -1098,9 +974,9 @@ elements.audio.addEventListener("loadedmetadata", async () => {
   }
 });
 elements.audio.addEventListener("error", async () => {
-  showToast("Safari could not read this audio file. Try another format.", true);
+  showToast("The browser could not read this audio file. Try another format.", true);
   if (state.sourceFromStorage) {
-    try { await repository.deleteLastSelectedSource(); } catch { /* It can still be cleared in Safari settings. */ }
+    try { await repository.deleteLastSelectedSource(); } catch { /* It can still be cleared in browser settings. */ }
   }
   resetSelectedFile();
 });
@@ -1146,13 +1022,6 @@ elements.delayInput.addEventListener("input", validateConfiguration);
 elements.startButton.addEventListener("click", startSession);
 elements.pauseButton.addEventListener("click", pauseOrResume);
 elements.stopButton.addEventListener("click", () => stopSession("manual"));
-elements.routingTestToggle.addEventListener("click", toggleRoutingTest);
-elements.routingOutputApply.addEventListener("click", applyRoutingOutput);
-elements.routingAfter.addEventListener("change", () => {
-  if (!state.routingTestStream || !elements.routingAfter.value) return;
-  setBrowserAudioSession(elements.routingAfter.value);
-  updateRoutingTestStatus();
-});
 elements.microphoneSetting.addEventListener("change", () => {
   const option = elements.microphoneSetting.selectedOptions[0];
   const label = elements.microphoneSetting.value ? option.textContent.replace(/ \(currently unavailable\)$/, "") : "Automatic";
@@ -1179,7 +1048,6 @@ document.addEventListener("visibilitychange", () => {
   else if (state.sessionActive) requestSessionWakeLock();
 });
 window.addEventListener("pagehide", () => {
-  stopRoutingTest(false);
   releaseSessionWakeLock();
   if (state.sessionActive) state.microphone?.release();
   state.transcriptionJob?.transcriber.cancel();
@@ -1220,8 +1088,6 @@ if (!["#/recorder", "#/sessions", "#/settings"].includes(window.location.hash)) 
 resetBrowserAudioSessionForPlayback();
 initializeTranscriptionSettings();
 renderMicrophoneSettings();
-renderRoutingOutputs();
-updateRoutingTestStatus();
 if (!isNativeRuntime) refreshMicrophoneDevices();
 if (!isNativeRuntime && navigator.mediaDevices) navigator.mediaDevices.addEventListener?.("devicechange", () => refreshMicrophoneDevices());
 initializeModelCache();

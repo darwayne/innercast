@@ -7,7 +7,7 @@ final class LoopbackServer {
 
     private let repository: NativeSessionRepository
     private weak var audio: NativeAudioPipeline?
-    private let queue = DispatchQueue(label: "com.darwayne.innercast.loopback")
+    private let queue = DispatchQueue(label: "\(Bundle.main.bundleIdentifier ?? "innercast").loopback")
     private var listener: NWListener?
 
     init(repository: NativeSessionRepository, audio: NativeAudioPipeline) {

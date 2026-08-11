@@ -83,7 +83,7 @@ async function decodeToWhisperAudio(
   isCancelled: () => boolean,
 ): Promise<Float32Array> {
   if (!window.AudioContext || !window.OfflineAudioContext) {
-    throw new Error("On-device audio decoding is not supported by this Safari version.");
+    throw new Error("On-device audio decoding is not supported by this browser version.");
   }
   onProgress({ phase: "decoding", message: "Preparing recording…", progress: 0 });
   const context = new AudioContext();

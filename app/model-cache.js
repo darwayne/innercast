@@ -45,7 +45,7 @@ function totalFromResponse(response, resumedBytes) {
  * A Cache-like adapter for Transformers.js that writes remote model responses
  * to IndexedDB incrementally. A cache miss is intentionally downloaded here:
  * Transformers.js otherwise materializes the entire response before calling
- * cache.put(), producing an avoidable second large in-memory copy in Safari.
+ * cache.put(), producing an avoidable second large in-memory copy in the browser.
  */
 export class ChunkedModelCache {
   constructor(onProgress = () => {}) {
@@ -242,7 +242,7 @@ export class ChunkedModelCache {
     let parts = [];
     let partsSize = 0;
     const reader = response.body?.getReader();
-    if (!reader) throw new Error("Streaming model downloads are not supported by this Safari version.");
+    if (!reader) throw new Error("Streaming model downloads are not supported by this browser version.");
 
     const saveParts = async () => {
       if (!partsSize) return;
@@ -283,7 +283,7 @@ export class ChunkedModelCache {
     } catch (error) {
       await reader.cancel().catch(() => {});
       if (error?.name === "QuotaExceededError" || /quota/i.test(error?.message || "")) {
-        throw new Error("Safari ran out of website storage while caching this model. The completed chunks were kept; free some website storage and retry.");
+        throw new Error("The browser ran out of website storage while caching this model. The completed chunks were kept; free some website storage and retry.");
       }
       throw new Error(`Model download paused after ${(receivedBytes / (1024 * 1024)).toFixed(0)} MB. Retry to resume it. ${error?.message || error}`);
     }

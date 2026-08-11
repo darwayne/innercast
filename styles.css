@@ -82,16 +82,7 @@ h1 em { color: var(--accent); font-weight: 500; }
 .timeline { flex: 1; min-width: 0; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 .time-row { display: flex; justify-content: space-between; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
-.routing-lab { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.routing-lab summary { color: var(--green); cursor: pointer; font-weight: 750; }
-.routing-lab > p { line-height: 1.5; }
-.native-runtime .routing-lab,
 .native-runtime [aria-labelledby="microphone-settings-title"] { display: none; }
-.routing-lab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.routing-lab-grid label { display: grid; gap: 6px; font-weight: 700; }
-.routing-lab-grid select, .routing-output-field select { width: 100%; min-width: 0; min-height: 42px; border: 1px solid var(--line); border-radius: 9px; background: white; padding: 0 9px; color: var(--ink); font: inherit; }
-.routing-output-field { display: grid; gap: 6px; margin-top: 10px; font-weight: 700; }
-.routing-test-status { margin-bottom: 0; font-variant-numeric: tabular-nums; }
 .mode-options { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
 .mode-card { display: flex; gap: 13px; align-items: center; min-height: 72px; padding: 14px 15px; border: 1px solid var(--line); border-radius: 14px; cursor: pointer; }
 .mode-card.selected { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); background: #f7faf7; }
@@ -163,7 +154,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   main { width: min(100% - 24px, 760px); padding-top: 43px; }.hero { margin-bottom: 25px; }.intro { font-size: 15px; }.privacy-note { align-items: flex-start; text-align: left; font-size: 12px; }
   .card { padding: 20px 16px; border-radius: 18px; }.file-picker { padding: 14px; }.file-icon { flex-basis: 42px; height: 42px; }.pick-action { display: none; }
   .mode-card { flex-wrap: wrap; }.mode-card > span:nth-of-type(2) { flex-basis: calc(100% - 35px); }.inline-input, .input-suffix { margin-left: 31px; width: calc(100% - 31px); }.input-suffix .inline-input { width: 100%; margin-left: 0; }
-  .routing-lab-grid { grid-template-columns: 1fr; }
   .active-session { padding: 22px 17px; margin-left: -4px; margin-right: -4px; }.active-times { grid-template-columns: 1.35fr 1fr 1fr; }.active-times strong { font-size: 14px; }
   .sessions-header { align-items: flex-start; flex-direction: column; }.sessions-header h1 { font-size: 44px; }.session-card-head { flex-direction: column; }.session-facts { grid-template-columns: 1fr 1fr; }
 }
