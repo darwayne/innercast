@@ -2,6 +2,16 @@
 
 **Play the journey. Record the experience.**
 
+<p align="center">
+  <a href="https://darwayne.github.io/innercast/">
+    <img src="assets/innercast-icon.svg" width="96" alt="Open the Innercast web app">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://darwayne.github.io/innercast/"><strong>Open Innercast in your browser →</strong></a>
+</p>
+
 Innercast is a browser-only, device-local audio companion. It plays a local source file while recording the microphone, preserves a simple source-to-microphone timeline mapping, and saves completed recordings as Blobs in IndexedDB. It has no backend, analytics, or cloud storage. Optional post-recording transcription runs Whisper or Moonshine inside the browser; microphone audio is never sent to a transcription service.
 
 The source picker explicitly supports AAC, M4A, MP4 audio, MP3, FLAC, WAV, AIFF, and CAF. Because iOS Files sometimes reports local audio with an empty or generic MIME type, Innercast also recognizes these filename extensions and lets the browser's audio decoder make the final compatibility decision. The most recently selected playable source file is saved as a Blob in IndexedDB and restored automatically after a refresh. Selecting another source replaces it, so only one reusable source copy is retained.
