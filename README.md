@@ -12,13 +12,13 @@
   <a href="https://darwayne.github.io/innercast/"><strong>Open Innercast in your browser →</strong></a>
 </p>
 
-Innercast is a browser-only, device-local audio companion. It plays a local source file while recording the microphone, preserves a simple source-to-microphone timeline mapping, and saves completed recordings as Blobs in IndexedDB. It has no backend, analytics, or cloud storage. Optional post-recording transcription runs Whisper or Moonshine inside the browser; microphone audio is never sent to a transcription service.
+Innercast is a device-local audio companion available as both a browser application and a native iOS app. It plays a local source file while recording the microphone, preserves a simple source-to-microphone timeline mapping, and saves completed sessions on the device. It has no backend, analytics, or cloud storage. Optional post-recording transcription runs locally through browser-based Whisper or Moonshine models, or through Apple Speech in the native app; microphone audio is never sent to a transcription service.
 
-The source picker explicitly supports AAC, M4A, MP4 audio, MP3, FLAC, WAV, AIFF, and CAF. Because iOS Files sometimes reports local audio with an empty or generic MIME type, Innercast also recognizes these filename extensions and lets the browser's audio decoder make the final compatibility decision. The most recently selected playable source file is saved as a Blob in IndexedDB and restored automatically after a refresh. Selecting another source replaces it, so only one reusable source copy is retained.
+The source picker accepts AAC, M4A, MP4 audio, MP3, FLAC, WAV, AIFF, and CAF, subject to the active browser or iOS decoder. Because iOS Files sometimes reports local audio with an empty or generic MIME type, the browser version also recognizes these filename extensions and lets the browser's decoder make the final compatibility decision. It saves the most recently selected playable source as a Blob in IndexedDB; the native app copies its last source into Application Support. Both restore that source automatically and replace it when another file is selected, so only one reusable source copy is retained per runtime.
 
 ## Native iOS app
 
-The dependency-free SwiftUI project in `ios/` packages the same web interface inside a native app. A loopback-only server bound to `127.0.0.1:49321` serves the checked-in web assets from the application bundle, so there is one shared web source tree and no network server is required at runtime. The native bridge replaces only the audio and session-storage pipelines; the standalone browser application continues using its existing browser implementations.
+The dependency-free SwiftUI project in `ios/` packages the same web interface inside a native app. A loopback-only server bound to `127.0.0.1:49321` serves the checked-in web assets from the application bundle, so there is one shared web source tree and no external server is required at runtime. The native bridge supplies the audio, session-storage, export, and Apple Speech transcription pipelines; the standalone browser application continues using its browser implementations.
 
 1. Copy `ios/Config/Signing.local.example.xcconfig` to `ios/Config/Signing.local.xcconfig`, then set your Apple Developer team ID and a unique reverse-DNS bundle identifier. The local file is ignored by Git, so personal developer configuration stays out of commits. Keep the bundle identifier unchanged after installing the app if you want future builds to retain its on-device data.
 2. Open `ios/Innercast.xcodeproj` in Xcode.
@@ -81,11 +81,11 @@ make tailscale PORT=4321
 
 This does not make Innercast public and does not upload audio. Tailscale Serve only proxies application traffic within the tailnet.
 
-There is no install or build step. The browser-ready JavaScript is committed in `app/`; the typed domain source is in `src/`.
+The browser version has no install or build step. Its browser-ready JavaScript is committed in `app/`; the typed domain source is in `src/`. Building the native version requires Xcode as described above.
 
 ## Offline use and Home Screen installation
 
-Innercast installs a service worker on its first successful HTTPS visit. It caches the application shell, routes, and pinned Transformers.js/ONNX runtime so Record, Sessions, and Settings can be opened later without reaching the Mac or Tailscale endpoint. The selected source file, recordings, metadata, and transcripts already live in IndexedDB.
+The browser version installs a service worker on its first successful HTTPS visit. It caches the application shell, routes, and pinned Transformers.js/ONNX runtime so Record, Sessions, and Settings can be opened later without reaching the Mac or Tailscale endpoint. The selected source file, recordings, metadata, and transcripts already live in IndexedDB. The native app bundles the same application shell and does not depend on the service worker or an external web server; its selected source, sessions, and transcripts live in the app's Application Support directory.
 
 For reliable offline preparation:
 
@@ -107,9 +107,11 @@ sourceTimestamp = recordingSourceOffsetSeconds + microphoneRecordingTimestamp
 
 For an absolute start at 5:30, microphone time `0` maps to source time `330`. A 30-second delayed start is normalized to the source position at which recording actually starts. If playback begins from a non-zero seek position, immediate mode maps microphone time `0` to that position, and delay mode adds its delay to that position.
 
-Innercast plays the source through the native `HTMLAudioElement` output path and uses its media clock (`currentTime`) alongside an `AudioContext` clock. The source is intentionally not routed through a `MediaElementAudioSourceNode`: direct media-element output is more reliable when Mobile Safari switches into its microphone-capture audio session. A display animation observes when the source reaches the configured threshold; the actual source position at `MediaRecorder.start()` becomes the saved offset. This avoids treating `setTimeout`, `setInterval`, or wall-clock time as synchronization truth. MediaRecorder start latency is browser-controlled, so this is deterministic timeline alignment rather than sample-accurate synchronization.
+In the browser, Innercast plays the source through the `HTMLAudioElement` output path and uses its media clock (`currentTime`) alongside an `AudioContext` clock. The source is intentionally not routed through a `MediaElementAudioSourceNode`: direct media-element output is more reliable when Mobile Safari switches into its microphone-capture audio session. A display animation observes when the source reaches the configured threshold; the actual source position at `MediaRecorder.start()` becomes the saved offset. This avoids treating `setTimeout`, `setInterval`, or wall-clock time as synchronization truth. MediaRecorder start latency is browser-controlled, so this is deterministic timeline alignment rather than sample-accurate synchronization.
 
-Seeking and configuration are locked for the entire active session. Pausing pauses both playback and MediaRecorder; resuming resumes both. This maintains the one-offset invariant without continuously timestamping samples.
+In the native app, one `AVAudioEngine` owns both source playback and microphone capture. An `AVAudioPlayerNode` provides source position from the audio-render timeline while an input-node tap writes microphone frames directly to an audio file. The bridge reports the source position at the moment recording begins and stores it using the same synchronization invariant as the browser.
+
+Seeking and configuration are locked for the entire active session. Pausing and resuming affect source playback and microphone capture together in both runtimes. In the browser this uses `MediaRecorder.pause()` and `MediaRecorder.resume()`; the native pipeline controls its player and capture timeline directly. This maintains the one-offset invariant without continuously timestamping samples.
 
 ## Start modes
 
@@ -121,23 +123,27 @@ The user may preview and seek before starting. An absolute recording timestamp c
 
 ## Saved sessions and privacy
 
-Completed microphone Blobs and metadata are stored directly in the versioned `synchronized-audio-recorder` IndexedDB database. Saved sessions contain source metadata rather than separate source copies; one shared copy of the most recently selected source is retained for convenient playback after refreshing. Saved sessions can be replayed, exported through the browser, or deleted. Browser storage estimates are shown when `navigator.storage.estimate()` is available, and quota failures produce an explicit message.
+In the browser, completed microphone Blobs and metadata are stored directly in the versioned `synchronized-audio-recorder` IndexedDB database. Browser storage estimates are shown when `navigator.storage.estimate()` is available, and quota failures produce an explicit message.
+
+In the native app, microphone audio is written incrementally as AAC/M4A and session metadata is stored alongside it in Application Support. Native storage estimates reflect the app's recording usage and the device's approximate available capacity. Recordings and the retained source file are excluded from device backup.
+
+In both runtimes, saved sessions contain source metadata rather than a separate source copy per session. One shared copy of the most recently selected source is retained for convenient playback after restarting or refreshing. Saved sessions can be replayed, exported through the browser download flow or native share sheet, and deleted.
 
 The Record, Sessions, and Settings screens use static-host-safe hash routes: `#/recorder`, `#/sessions`, and `#/settings`. Refreshing, bookmarking, and browser back/forward navigation preserve the selected screen without requiring server-side route rewriting.
 
-The Settings screen also offers a microphone preference. Innercast uses `enumerateDevices()` to list the audio inputs the browser exposes and requests a selected device with an exact `deviceId` constraint. Device labels may remain hidden until the user taps **Find microphones** and grants access. The preference stays on the device in local storage. If the chosen input disappears, Innercast stops before starting a session and asks the user to reconnect it or choose another input rather than silently recording from the wrong microphone.
+In the browser, the Settings screen also offers a microphone preference. Innercast uses `enumerateDevices()` to list the audio inputs the browser exposes and requests a selected device with an exact `deviceId` constraint. Device labels may remain hidden until the user taps **Find microphones** and grants access. The preference stays on the device in local storage. If the chosen input disappears, Innercast stops before starting a session and asks the user to reconnect it or choose another input rather than silently recording from the wrong microphone. The native app deliberately uses the built-in iPhone microphone so Bluetooth headphones can remain on their high-quality stereo A2DP output route.
 
-Each saved session offers one **Transcribe** action. The default is **Whisper Small English** (roughly 250 MB); choose a different default on `#/settings`. Other Whisper choices are **Tiny English** (roughly 45 MB), **Base English** (roughly 80 MB), and experimental **Distil-Medium English** (roughly 405 MB). Moonshine choices are **Tiny English** (roughly 55 MB), **Base English** (roughly 127 MB), experimental **Small Streaming English** (roughly 216 MB), and bleeding-edge **Medium Streaming English** (roughly 363 MB). Moonshine Tiny and Base use Transformers.js with the official FP32-encoder/q8-decoder WASM configuration. The v2 Small and Medium choices use pinned, merged-decoder INT8 ONNX exports through ONNX Runtime Web; the merged graph avoids keeping two mostly duplicated decoder models in memory. Innercast first saves the recording and only then decodes and transcribes it in a Web Worker, so transcription cannot compete with or interrupt active microphone capture. Sections are processed sequentially and the completed text plus approximate microphone/source timestamps are written back to the same IndexedDB session. Whisper uses zero-padded 30-second windows, original Moonshine receives variable windows up to 30 seconds, and Moonshine v2 uses shorter 15-second windows to limit peak mobile memory.
+In the browser, each saved session offers one **Transcribe** action. The default is **Whisper Small English** (roughly 250 MB); choose a different default on `#/settings`. Other Whisper choices are **Tiny English** (roughly 45 MB), **Base English** (roughly 80 MB), and experimental **Distil-Medium English** (roughly 405 MB). Moonshine choices are **Tiny English** (roughly 55 MB), **Base English** (roughly 127 MB), experimental **Small Streaming English** (roughly 216 MB), and bleeding-edge **Medium Streaming English** (roughly 363 MB). Moonshine Tiny and Base use Transformers.js with the official FP32-encoder/q8-decoder WASM configuration. The v2 Small and Medium choices use pinned, merged-decoder INT8 ONNX exports through ONNX Runtime Web; the merged graph avoids keeping two mostly duplicated decoder models in memory. Innercast first saves the recording and only then decodes and transcribes it in a Web Worker, so transcription cannot compete with or interrupt active microphone capture. Sections are processed sequentially and the completed text plus approximate microphone/source timestamps are written back to the same IndexedDB session. Whisper uses zero-padded 30-second windows, original Moonshine receives variable windows up to 30 seconds, and Moonshine v2 uses shorter 15-second windows to limit peak mobile memory.
 
-The native app presents the same Sessions transcription interface but uses Apple Speech rather than the browser model setting. Completed transcripts are stored beside the native recording with their microphone/source timing relationship. Both runtimes provide **Copy transcript** inside the expanded saved transcript.
+The native app presents the same Sessions transcription interface but uses Apple Speech rather than the browser model setting. Completed transcripts are stored beside the native recording with their microphone/source timing relationship. Both runtimes provide a copy icon in the saved transcript heading.
 
-The first use of a model requires internet access to download the pinned inference runtime and selected model from their public asset hosts. Downloaded chunks are persisted as they arrive, so retrying after a network interruption or WebKit worker termination can continue instead of retaining or redownloading one enormous response. Browser storage normally avoids repeating the model download, but Safari may evict cached assets. Once the runtime and model have loaded successfully, that choice can be reused offline. Inference is local: only application/runtime/model files are downloaded, and the recording is never uploaded. All current choices are English-only. The larger models are experimental. Moonshine Medium in particular can still exceed Safari's runtime memory limit even though its download is resumable and its files are cached in chunks; download chunking prevents the avoidable download-time spike but cannot remove the memory needed by ONNX Runtime during inference. Cache schema version 2 removes files belonging to the retired full Whisper Medium and Distil-Large choices without deleting working models, recordings, or sessions.
+The first use of a browser model requires internet access to download the pinned inference runtime and selected model from their public asset hosts. Downloaded chunks are persisted as they arrive, so retrying after a network interruption or WebKit worker termination can continue instead of retaining or redownloading one enormous response. Browser storage normally avoids repeating the model download, but Safari may evict cached assets. Once the runtime and model have loaded successfully, that choice can be reused offline. Inference is local: only application/runtime/model files are downloaded, and the recording is never uploaded. All current choices are English-only. The larger models are experimental. Moonshine Medium in particular can still exceed Safari's runtime memory limit even though its download is resumable and its files are cached in chunks; download chunking prevents the avoidable download-time spike but cannot remove the memory needed by ONNX Runtime during inference. Cache schema version 2 removes files belonging to the retired full Whisper Medium and Distil-Large choices without deleting working models, recordings, or sessions.
 
 Moonshine v2 Small Streaming and Medium Streaming use community INT8 ONNX exports derived from the official Useful Sensors checkpoints. They run as post-recording chunk transcription rather than live incremental transcription, matching Innercast's saved-session workflow. Tiny Streaming is not separately listed because it is smaller than Base and currently lacks the same memory-saving merged browser export; the existing Tiny and Base choices cover the lightweight comparison points without loading two duplicate decoder graphs.
 
-Clearing Safari website data or using private browsing can remove recordings. Export anything important. The first version assembles each recording in memory before saving, which is appropriate for the expected recordings of roughly 50 MB or less; the recorder already isolates chunk collection so incremental persistence can be added later.
+Clearing Safari website data or using private browsing can remove browser recordings. Export anything important. The browser recorder assembles each completed recording in memory before saving, which is appropriate for the expected recordings of roughly 50 MB or less; its recording layer isolates chunk collection so incremental persistence can be added later. The native pipeline already writes microphone frames incrementally to its recording file.
 
-## Test on a physical iPhone
+## Test the browser version on a physical iPhone
 
 Microphone access requires a **secure context**. `localhost` is accepted on the Mac itself, but an iPhone opening the Mac's plain `http://` LAN address will generally not receive microphone access.
 
@@ -182,15 +188,21 @@ index.html                    Mobile-first application shell
 styles.css                   Responsive visual design
 app/app.js                   UI and session orchestration
 app/controllers.js           Recorder and synchronization controllers
+app/native-runtime.js        Native bridge client and native repository adapter
 app/repository.js            Versioned IndexedDB sessions and last-source storage
 app/timestamp.js             Timestamp and alignment helpers
 app/file-types.js            Robust audio file recognition
 app/whisper-transcriber.js   Post-recording decode and worker lifecycle
 app/whisper-worker.js        On-device Whisper/Moonshine inference and chunk mapping
+app/moonshine-v2-worker.js   Streaming Moonshine ONNX inference
+app/model-cache.js           Resumable, chunked IndexedDB model cache
 service-worker.js            Offline application/runtime caching
 manifest.webmanifest         Home Screen installation metadata
 assets/innercast-icon.svg    Install and browser icon
 src/                         Typed domain source
 tests/                       Dependency-free browser tests
+ios/Innercast/               SwiftUI shell, loopback server, and native pipelines
+ios/Config/                  Shareable and local signing configuration
+ios/Innercast.xcodeproj/     Native iOS Xcode project
 Makefile                     Local static server commands
 ```

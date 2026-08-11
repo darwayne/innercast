@@ -791,13 +791,16 @@ function renderSavedTranscript(article, session) {
   summary.textContent = `Transcript · ${session.transcription.language || "Unknown language"}${modelLabel}`;
   const transcript = document.createElement("p");
   transcript.textContent = session.transcription.text || session.transcription.errorMessage || "No speech was recognized.";
-  details.append(summary, transcript);
   if (session.transcription.text?.trim()) {
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "copy-transcript";
-    copy.textContent = "Copy transcript";
-    copy.addEventListener("click", async () => {
+    copy.title = "Copy transcript to clipboard";
+    copy.setAttribute("aria-label", "Copy transcript to clipboard");
+    copy.innerHTML = `<span class="copy-transcript-icon" aria-hidden="true"></span>`;
+    copy.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       try {
         await copyTranscript(session.transcription.text);
         showToast("Transcript copied to the clipboard.");
@@ -805,8 +808,9 @@ function renderSavedTranscript(article, session) {
         showToast(`Could not copy the transcript: ${error.message || error}`, true);
       }
     });
-    details.append(copy);
+    summary.append(copy);
   }
+  details.append(summary, transcript);
   article.querySelector("audio").after(details);
 }
 

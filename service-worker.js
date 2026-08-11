@@ -1,14 +1,14 @@
 const CACHE_PREFIX = "innercast-";
-const APP_CACHE = `${CACHE_PREFIX}app-v28`;
+const APP_CACHE = `${CACHE_PREFIX}app-v30`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-v1`;
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
+  "./styles.css?v=2",
   "./manifest.webmanifest",
   "./assets/innercast-icon.svg",
-  "./app/app.js?v=28",
+  "./app/app.js?v=30",
   "./app/controllers.js?v=22",
   "./app/file-types.js",
   "./app/repository.js",
