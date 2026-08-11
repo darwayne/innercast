@@ -31,6 +31,8 @@ The dependency-free SwiftUI project in `ios/` packages the same web interface in
 
 The native app requires iOS 18 or newer and uses only SwiftUI, WebKit, Network, AVFoundation, and system file APIs. It retains the timestamp and session model used by the browser application. Native recordings and the last selected source are excluded from device backup and never leave the device. Native transcription is intentionally deferred; the standalone browser application retains the existing Whisper and Moonshine features.
 
+Microphone recording is channel-adaptive in both runtimes. Innercast requests two input channels and records genuine stereo when the selected microphone route provides it; otherwise it records mono without duplicating the signal. Saved session metadata records the actual channel count.
+
 ## Run on macOS
 
 The only runtime dependency is the `python3` included with macOS developer tools.

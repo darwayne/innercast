@@ -2,6 +2,7 @@ export interface CompletedRecording {
   blob: Blob;
   mimeType: string;
   durationSeconds: number;
+  channelCount: number;
 }
 
 /** Captures MediaRecorder chunks; persistence deliberately lives elsewhere. */
@@ -18,6 +19,7 @@ export class MicrophoneRecorder {
   mimeType = "";
   deviceId = "";
   deviceLabel = "";
+  channelCount = 1;
   onUnexpectedStop: ((error: Error) => void) | null = null;
 
   static chooseMimeType(): string {
@@ -46,12 +48,15 @@ export class MicrophoneRecorder {
       echoCancellation: false,
       noiseSuppression: true,
       autoGainControl: true,
+      channelCount: { ideal: 2 },
     };
     if (deviceId) audio.deviceId = { exact: deviceId };
     this.stream = await navigator.mediaDevices.getUserMedia({ audio });
     const track = this.stream.getAudioTracks()[0];
-    this.deviceId = track?.getSettings().deviceId ?? deviceId;
+    const settings = track?.getSettings() ?? {};
+    this.deviceId = settings.deviceId ?? deviceId;
     this.deviceLabel = track?.label ?? "";
+    this.channelCount = Math.max(1, Number(settings.channelCount) || 1);
     const type = MicrophoneRecorder.chooseMimeType();
     this.recorder = new MediaRecorder(this.stream, type ? { mimeType: type } : undefined);
     this.mimeType = this.recorder.mimeType || type || "application/octet-stream";
@@ -109,7 +114,7 @@ export class MicrophoneRecorder {
       new Promise<Blob>((resolve) => window.setTimeout(() => resolve(fallbackBlob()), 1500)),
     ]);
     this.release();
-    return { blob, mimeType: this.mimeType, durationSeconds };
+    return { blob, mimeType: this.mimeType, durationSeconds, channelCount: this.channelCount };
   }
 
   release(): void {

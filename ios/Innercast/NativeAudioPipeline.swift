@@ -22,6 +22,7 @@ final class NativeAudioPipeline {
     private var sessionPaused = false
     private var micFramesWritten: AVAudioFramePosition = 0
     private var micSampleRate: Double = 48_000
+    private var micChannelCount = 1
     private var sourceStartFrame: AVAudioFramePosition = 0
     private var targetSourceSeconds: Double = 0
     private var actualOffsetSeconds: Double = 0
@@ -111,6 +112,7 @@ final class NativeAudioPipeline {
         let inputFormat = input.outputFormat(forBus: 0)
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else { throw NativeAudioError.invalidInput }
         micSampleRate = inputFormat.sampleRate
+        micChannelCount = Int(inputFormat.channelCount)
 
         let id = UUID().uuidString
         recordingID = id
@@ -119,8 +121,8 @@ final class NativeAudioPipeline {
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: inputFormat.sampleRate,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 128_000
+            AVNumberOfChannelsKey: micChannelCount,
+            AVEncoderBitRateKey: micChannelCount > 1 ? 192_000 : 128_000
         ]
         let outputFile = try AVAudioFile(forWriting: audioURL, settings: settings)
         recordingFile = outputFile
@@ -190,7 +192,13 @@ final class NativeAudioPipeline {
             mode: synchronization.mode,
             configuredValueSeconds: synchronization.configuredValueSeconds
         )
-        let saved = try repository.save(id: id, source: sourceMetadata, synchronization: synchronization, durationSeconds: duration)
+        let saved = try repository.save(
+            id: id,
+            source: sourceMetadata,
+            synchronization: synchronization,
+            durationSeconds: duration,
+            channelCount: micChannelCount
+        )
         eventHandler?(["type": "sessionCompleted", "payload": ["reason": reason, "session": saved.dictionary()]])
         return saved
     }
@@ -203,6 +211,7 @@ final class NativeAudioPipeline {
             "input": route.inputs.map(\.portName).joined(separator: ", "),
             "output": route.outputs.map(\.portName).joined(separator: ", "),
             "sampleRate": session.sampleRate,
+            "inputChannels": micChannelCount,
             "outputChannels": engine.outputNode.inputFormat(forBus: 0).channelCount,
             "bluetoothPolicy": "A2DP only; HFP prohibited"
         ]
@@ -252,6 +261,11 @@ final class NativeAudioPipeline {
         try session.setPreferredInput(microphone)
         guard session.currentRoute.inputs.contains(where: { $0.portType == .builtInMic }) else {
             throw NativeAudioError.builtInMicrophoneUnavailable
+        }
+        // Prefer genuine stereo capture when the active microphone route offers
+        // it. A mono route remains mono; no channel duplication is performed.
+        if session.maximumInputNumberOfChannels >= 2 {
+            try? session.setPreferredInputNumberOfChannels(2)
         }
     }
 

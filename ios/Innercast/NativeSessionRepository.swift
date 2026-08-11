@@ -11,6 +11,8 @@ struct NativeRecordingMetadata: Codable, Sendable {
     let mimeType: String
     let sizeBytes: Int64
     let durationSeconds: Double
+    // Optional so recordings saved by earlier builds remain decodable.
+    let channelCount: Int?
 }
 
 struct NativeSynchronizationMetadata: Codable, Sendable {
@@ -40,6 +42,7 @@ struct NativeSession: Codable, Sendable {
                 "mimeType": recording.mimeType,
                 "sizeBytes": recording.sizeBytes,
                 "durationSeconds": recording.durationSeconds,
+                "channelCount": recording.channelCount ?? 1,
                 "playbackUrl": "/native/sessions/\(id)/audio"
             ],
             "synchronization": [
@@ -84,7 +87,8 @@ final class NativeSessionRepository: @unchecked Sendable {
         id: String,
         source: NativeSourceMetadata,
         synchronization: NativeSynchronizationMetadata,
-        durationSeconds: Double
+        durationSeconds: Double,
+        channelCount: Int
     ) throws -> NativeSession {
         lock.lock()
         defer { lock.unlock() }
@@ -99,7 +103,8 @@ final class NativeSessionRepository: @unchecked Sendable {
             recording: NativeRecordingMetadata(
                 mimeType: "audio/mp4",
                 sizeBytes: size,
-                durationSeconds: durationSeconds
+                durationSeconds: durationSeconds,
+                channelCount: channelCount
             ),
             synchronization: synchronization
         )

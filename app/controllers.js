@@ -6,6 +6,7 @@ export class MicrophoneRecorder {
     this.mimeType = "";
     this.deviceId = "";
     this.deviceLabel = "";
+    this.channelCount = 1;
     this.startClockTime = null;
     this.pausedClockTime = null;
     this.accumulatedPauseSeconds = 0;
@@ -26,12 +27,19 @@ export class MicrophoneRecorder {
     if (!window.MediaRecorder) throw new Error("MediaRecorder is not supported by this browser. Update your browser or operating system and try again.");
     // Keep noise suppression and automatic gain enabled while avoiding the
     // echo-cancellation path that may trigger iOS playback ducking.
-    const audio = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
+    const audio = {
+      echoCancellation: false,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: { ideal: 2 },
+    };
     if (deviceId) audio.deviceId = { exact: deviceId };
     this.stream = await navigator.mediaDevices.getUserMedia({ audio });
     const track = this.stream.getAudioTracks()[0];
-    this.deviceId = track?.getSettings?.().deviceId || deviceId;
+    const settings = track?.getSettings?.() || {};
+    this.deviceId = settings.deviceId || deviceId;
     this.deviceLabel = track?.label || "";
+    this.channelCount = Math.max(1, Number(settings.channelCount) || 1);
     const type = MicrophoneRecorder.chooseMimeType();
     const options = type ? { mimeType: type } : undefined;
     this.recorder = new MediaRecorder(this.stream, options);
@@ -88,7 +96,7 @@ export class MicrophoneRecorder {
       new Promise((resolve) => window.setTimeout(() => resolve(fallbackBlob()), 1500)),
     ]);
     this.release();
-    return { blob, mimeType: this.mimeType, durationSeconds };
+    return { blob, mimeType: this.mimeType, durationSeconds, channelCount: this.channelCount };
   }
 
   release() {

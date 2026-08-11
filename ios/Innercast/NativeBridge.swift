@@ -71,8 +71,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply, WKNavigatio
             let id = payload["id"] as? String ?? ""
             replyHandler(repository.session(id: id)?.dictionary() as Any, nil)
         case "deleteSession":
+            guard let id = payload["id"] as? String, !id.isEmpty else {
+                replyHandler(nil, "The recording ID is missing.")
+                return
+            }
             reply({
-                try repository.delete(id: payload["id"] as? String ?? "")
+                try repository.delete(id: id)
                 return ["deleted": true]
             }, using: replyHandler)
         case "exportSession":
@@ -122,6 +126,27 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply, WKNavigatio
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReadyHandler?()
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        guard frame.isMainFrame, let presenter = webView.nearestViewController else {
+            completionHandler(false)
+            return
+        }
+
+        let alert = UIAlertController(title: "Innercast", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            completionHandler(false)
+        })
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
+            completionHandler(true)
+        })
+        presenter.present(alert, animated: true)
     }
 
     func webView(

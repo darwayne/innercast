@@ -1,6 +1,6 @@
 import { formatTimestamp, parseTimestamp, validateOffset } from "./timestamp.js";
 import { RecordingRepository } from "./repository.js";
-import { MicrophoneRecorder, SynchronizationController } from "./controllers.js?v=21";
+import { MicrophoneRecorder, SynchronizationController } from "./controllers.js?v=22";
 import { isLikelyAudioFile } from "./file-types.js";
 import { OnDeviceWhisperTranscriber, WHISPER_MODELS } from "./whisper-transcriber.js?v=19";
 import { ChunkedModelCache } from "./model-cache.js?v=19";
@@ -275,6 +275,13 @@ function bytesLabel(bytes) {
   return `${(bytes / 1024 ** 4).toFixed(2)} TB`;
 }
 
+function channelCountLabel(value) {
+  const count = Math.max(1, Math.trunc(Number(value) || 1));
+  if (count === 1) return "Mono";
+  if (count === 2) return "Stereo";
+  return `${count} channels`;
+}
+
 function currentMode() { return document.querySelector('input[name="mode"]:checked').value; }
 
 function configuredOffset() {
@@ -470,6 +477,7 @@ function renderActiveSession() {
     ["Recording state", state.sessionActive ? (sync.recordingStarted ? "recording" : "waiting") : "idle"],
     ["MediaRecorder state", state.microphone.state],
     ["Microphone input", state.microphone.deviceLabel || microphoneLabelForId(state.microphone.deviceId)],
+    ["Microphone channels", state.microphone.channelCount],
     ["Selected MIME type", state.microphone.mimeType || "—"],
     ["Mic elapsed", micElapsed.toFixed(3)],
     ["Mapped source time", sync.sourceTimeForMicTime(micElapsed).toFixed(3)],
@@ -639,7 +647,13 @@ async function stopSession(reason = "manual") {
         id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         createdAt: new Date().toISOString(),
         source: { filename: state.file.name, mimeType: state.file.type, sizeBytes: state.file.size, durationSeconds: state.duration },
-        recording: { blob: result.blob, mimeType: result.mimeType, sizeBytes: result.blob.size, durationSeconds: result.durationSeconds },
+        recording: {
+          blob: result.blob,
+          mimeType: result.mimeType,
+          sizeBytes: result.blob.size,
+          durationSeconds: result.durationSeconds,
+          channelCount: result.channelCount,
+        },
         synchronization: {
           recordingSourceOffsetSeconds: state.synchronization.recordingSourceOffsetSeconds,
           mode: state.synchronization.mode,
@@ -851,6 +865,7 @@ async function loadSessions() {
           <div><span>Starts at</span><strong>${formatTimestamp(session.synchronization.recordingSourceOffsetSeconds)}</strong></div>
           <div><span>Size</span><strong>${bytesLabel(session.recording.sizeBytes)}</strong></div>
           <div><span>Format</span><strong>${session.recording.mimeType || "Unknown"}</strong></div>
+          <div><span>Channels</span><strong>${channelCountLabel(session.recording.channelCount)}</strong></div>
         </div>
         <audio controls preload="metadata" src="${url}"></audio>
         <div class="session-buttons"><a href="${url}">Export</a><button class="delete-button">Delete</button></div>`;

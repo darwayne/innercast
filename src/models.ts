@@ -12,6 +12,8 @@ export interface RecordingMetadata {
   mimeType: string;
   sizeBytes: number;
   durationSeconds: number;
+  /** Missing on sessions saved before adaptive multichannel recording. */
+  channelCount?: number;
 }
 
 export interface SynchronizationMetadata {
